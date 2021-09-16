@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using VRChatUtilityKit.Utilities;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.1", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.2", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 namespace CameraAnimation
@@ -16,13 +16,11 @@ namespace CameraAnimation
         private GameObject PhotoCamera;
         private GameObject CloneVideoCamera;
         private readonly List<StoreTransform> positions = new List<StoreTransform>();
-        private int currentPosition = 0;
-        private float percent = 0;
         private float speed = 0.5f;
-        private float smoothingFactor = 0.2f;
         private bool animationActive = false;
         private LineRenderer lineRenderer;
         private GameObject Lens;
+        private Animation anim = null;
 
         public override void OnApplicationStart()
         {
@@ -31,7 +29,7 @@ namespace CameraAnimation
                 delegate {
                     MelonLogger.Msg("Camera Animation Menu Opened");
                     CustomSubMenu.AddButton("Save Pos", () => AddCurrentPositionToList());
-                    CustomSubMenu.AddButton("Play Anim", () => animationActive = true);
+                    CustomSubMenu.AddButton("Play Anim", () => PlayAnimation());
                     CustomSubMenu.AddButton("Clear Anim", () => 
                     { 
                         positions.Clear(); 
@@ -43,7 +41,6 @@ namespace CameraAnimation
                         
                     });
                     CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, 0.5f);
-                    CustomSubMenu.AddRadialPuppet("Smoothing", (x) => smoothingFactor = Mathf.Lerp(0.01f, 0.49f, x), 0.4f);
                 }
             );
             MelonLogger.Msg("Actionmenu initialised");
@@ -90,7 +87,7 @@ namespace CameraAnimation
             if (animationActive)
             {
                 CloneVideoCamera.active = true;
-                PlayAnimation();
+                if (!anim.isPlaying) animationActive = false;
             }
             else
             {
@@ -98,60 +95,88 @@ namespace CameraAnimation
             }
                 
         }
-        public float GetTransformedPercent()
+
+        public AnimationClip CreateClip()
         {
+            AnimationClip clip = new AnimationClip();
+            clip.legacy = true;
+            AnimationCurve curveX = new AnimationCurve();
+            AnimationCurve curveY = new AnimationCurve();
+            AnimationCurve curveZ = new AnimationCurve();
 
-            return percent;
+            AnimationCurve curveRotX = new AnimationCurve();
+            AnimationCurve curveRotY = new AnimationCurve();
+            AnimationCurve curveRotZ = new AnimationCurve();
+
+            float time = 0;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                curveX.AddKey(time, positions[i].position.x);
+                curveY.AddKey(time, positions[i].position.y);
+                curveZ.AddKey(time, positions[i].position.z);
+
+                float rotX = positions[i].eulerAngles.x;
+                float rotY = positions[i].eulerAngles.y;
+                float rotZ = positions[i].eulerAngles.z;
+                if (i != 0)
+                {
+                    //correct rotations to be negative if needed and writeback for next itteration
+                    float lastRotX = positions[i-1].eulerAngles.x;
+                    float lastRotY = positions[i-1].eulerAngles.y;
+                    float lastRotZ = positions[i-1].eulerAngles.z;
+
+                    if (Mathf.Abs(lastRotX - rotX) > 180)
+                    {
+                        rotX = 360 - rotX;
+                        positions[i].eulerAngles.x = rotX;
+                    }
+                    if (Mathf.Abs(lastRotY - rotY) > 180)
+                    {
+                        rotY = 360 - rotY;
+                        positions[i].eulerAngles.y = rotY;
+                    }
+                    if (Mathf.Abs(lastRotZ - rotZ) > 180)
+                    {
+                        rotZ = 360 - rotZ;
+                        positions[i].eulerAngles.z = rotZ;
+                    }
+
+                }
+
+                curveRotX.AddKey(time, rotX);
+                curveRotY.AddKey(time, rotY);
+                curveRotZ.AddKey(time, rotZ);
+
+                time += Mathf.Lerp(0.5f, 5f, 1-speed);
+
+            }
+            var type = UnhollowerRuntimeLib.Il2CppType.Of<Transform>();
+            clip.SetCurve("", type, "localPosition.x", curveX);
+            clip.SetCurve("", type, "localPosition.y", curveY);
+            clip.SetCurve("", type, "localPosition.z", curveZ);
+
+            clip.SetCurve("", type, "localEulerAngles.x", curveRotX);
+            clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
+            clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
+
+            //clip.EnsureQuaternionContinuity();
+
+
+
+            return clip;
+
+
         }
-
         public void PlayAnimation()
         {
-            percent += Time.deltaTime * Mathf.Lerp(0.1f, 1.9f, speed);
-            if (percent >= 1)
-            {
-                percent -= 1;
-                currentPosition++;
-            }
+            anim = CloneVideoCamera.GetComponent<Animation>();
+            if(anim == null)
+                anim = CloneVideoCamera.AddComponent<Animation>();
 
-            float tranformedPercent = GetTransformedPercent();
-            if (currentPosition>= positions.Count - 1)
-            {
-                CloneVideoCamera.transform.FromCopy(positions[positions.Count - 1]);
-                animationActive = false;
-                currentPosition = 0; 
-                percent = 0;
-            }
-            else
-            {
-                float invSmoothingFactor = 1 - smoothingFactor;
-                if (tranformedPercent > (invSmoothingFactor) && currentPosition + 2 <= positions.Count - 1)
-                {
-                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, invSmoothingFactor);
-                    Vector3 pos2 = Vector3.Lerp(positions[currentPosition+1].position, positions[currentPosition + 2].position, smoothingFactor);
-
-                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, invSmoothingFactor);
-                    Quaternion rot2 = Quaternion.Lerp(positions[currentPosition +1].rotation, positions[currentPosition + 2].rotation, smoothingFactor);
-
-
-                    CloneVideoCamera.transform.position = Vector3.Lerp(pos1, pos2, (tranformedPercent - invSmoothingFactor) * (1 / smoothingFactor / 2));
-                    CloneVideoCamera.transform.rotation = Quaternion.Lerp(rot1, rot2, (tranformedPercent - (invSmoothingFactor)) * (1 / smoothingFactor / 2));
-                }else if(tranformedPercent < smoothingFactor && currentPosition !=0){
-                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition-1].position, positions[currentPosition].position, invSmoothingFactor);
-                    Vector3 pos2 = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, smoothingFactor);
-
-                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition-1].rotation, positions[currentPosition ].rotation, invSmoothingFactor);
-                    Quaternion rot2 = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, smoothingFactor);
-
-
-                    CloneVideoCamera.transform.position = Vector3.Lerp(pos1, pos2, 0.5f + tranformedPercent * (1 / smoothingFactor / 2));
-                    CloneVideoCamera.transform.rotation = Quaternion.Lerp(rot1, rot2, 0.5f + tranformedPercent * (1 / smoothingFactor / 2));
-                }
-                else
-                {
-                    CloneVideoCamera.transform.position = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, tranformedPercent);
-                    CloneVideoCamera.transform.rotation = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, tranformedPercent);
-                }
-            }
+            var clip = CreateClip();
+            anim.AddClip(clip, clip.name);
+            anim.Play(clip.name);
+            animationActive = true;
         }
     
     }
@@ -161,6 +186,7 @@ namespace CameraAnimation
         public Vector3 position;
         public Quaternion rotation;
         public Vector3 localScale;
+        public Vector3 eulerAngles;
     }
 
     public static class TransformSerializationExtension
@@ -171,7 +197,8 @@ namespace CameraAnimation
             {
                 position = aTransform.position,
                 rotation = aTransform.rotation,
-                localScale = aTransform.localScale
+                localScale = aTransform.localScale,
+                eulerAngles = aTransform.rotation.eulerAngles
             };
         }
         public static void FromCopy(this Transform aTransform, StoreTransform newPos)
