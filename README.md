@@ -1,5 +1,5 @@
 # CameraAnimation
-Create animations for recording scenes in VRChat. Only with VR usable in the current version
+Create animations for recording scenes in VRChat. Only usable with VR in the current version
 
 
 Requires [VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit) and [ActionMenuApi](https://github.com/gompocp/ActionMenuApi)
