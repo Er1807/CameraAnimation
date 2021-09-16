@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using VRChatUtilityKit.Utilities;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "CameraAnimation", "1.0.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.1", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 namespace CameraAnimation
@@ -46,6 +46,7 @@ namespace CameraAnimation
                     CustomSubMenu.AddRadialPuppet("Smoothing", (x) => smoothingFactor = Mathf.Lerp(0.01f, 0.49f, x), 0.4f);
                 }
             );
+            MelonLogger.Msg("Actionmenu initialised");
             VRCUtils.OnUiManagerInit += Init;
         }
         
@@ -54,7 +55,6 @@ namespace CameraAnimation
         {
             FindCamera();
 
-            MelonLogger.Msg("Buttons sucessfully created");
         }
 
         private void FindCamera()
@@ -123,22 +123,23 @@ namespace CameraAnimation
             }
             else
             {
-                if(tranformedPercent > (1 - smoothingFactor) && currentPosition + 2 <= positions.Count - 1)
+                float invSmoothingFactor = 1 - smoothingFactor;
+                if (tranformedPercent > (invSmoothingFactor) && currentPosition + 2 <= positions.Count - 1)
                 {
-                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, 1 - smoothingFactor);
+                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, invSmoothingFactor);
                     Vector3 pos2 = Vector3.Lerp(positions[currentPosition+1].position, positions[currentPosition + 2].position, smoothingFactor);
 
-                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, 1 - smoothingFactor);
+                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, invSmoothingFactor);
                     Quaternion rot2 = Quaternion.Lerp(positions[currentPosition +1].rotation, positions[currentPosition + 2].rotation, smoothingFactor);
 
 
-                    CloneVideoCamera.transform.position = Vector3.Lerp(pos1, pos2, (tranformedPercent - (1 - smoothingFactor)) * (1 / smoothingFactor / 2));
-                    CloneVideoCamera.transform.rotation = Quaternion.Lerp(rot1, rot2, (tranformedPercent - (1-smoothingFactor)) * (1 / smoothingFactor / 2));
+                    CloneVideoCamera.transform.position = Vector3.Lerp(pos1, pos2, (tranformedPercent - invSmoothingFactor) * (1 / smoothingFactor / 2));
+                    CloneVideoCamera.transform.rotation = Quaternion.Lerp(rot1, rot2, (tranformedPercent - (invSmoothingFactor)) * (1 / smoothingFactor / 2));
                 }else if(tranformedPercent < smoothingFactor && currentPosition !=0){
-                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition-1].position, positions[currentPosition].position, 1 - smoothingFactor);
+                    Vector3 pos1 = Vector3.Lerp(positions[currentPosition-1].position, positions[currentPosition].position, invSmoothingFactor);
                     Vector3 pos2 = Vector3.Lerp(positions[currentPosition].position, positions[currentPosition + 1].position, smoothingFactor);
 
-                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition-1].rotation, positions[currentPosition ].rotation, 1 - smoothingFactor);
+                    Quaternion rot1 = Quaternion.Lerp(positions[currentPosition-1].rotation, positions[currentPosition ].rotation, invSmoothingFactor);
                     Quaternion rot2 = Quaternion.Lerp(positions[currentPosition].rotation, positions[currentPosition + 1].rotation, smoothingFactor);
 
 
