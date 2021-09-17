@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using VRChatUtilityKit.Utilities;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.2", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.3", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 namespace CameraAnimation
