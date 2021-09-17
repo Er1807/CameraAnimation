@@ -29,6 +29,7 @@ namespace CameraAnimation
                 delegate {
                     MelonLogger.Msg("Camera Animation Menu Opened");
                     CustomSubMenu.AddButton("Save Pos", () => AddCurrentPositionToList());
+                    CustomSubMenu.AddButton("Delete last Pos", () => RemoveLastPosition());
                     CustomSubMenu.AddButton("Play Anim", () => PlayAnimation());
                     CustomSubMenu.AddButton("Clear Anim", () => 
                     { 
@@ -46,6 +47,7 @@ namespace CameraAnimation
             MelonLogger.Msg("Actionmenu initialised");
             VRCUtils.OnUiManagerInit += Init;
         }
+
         
 
         private void Init()
@@ -66,17 +68,40 @@ namespace CameraAnimation
             lineRenderer.startWidth = 0.05f;
             lineRenderer.positionCount = 0;
         }
+        public void RemoveLastPosition()
+        {
+            if (positions.Count == 0) return;
+            GameObject.Destroy(lineRenderer.transform.GetChild(positions.Count - 1).gameObject);
+            positions.RemoveAt(positions.Count - 1);
+            UpdateLineRenderer();
+        }
+
         public void AddCurrentPositionToList()
         {
             if (PhotoCamera == null) FindCamera();
             positions.Add(PhotoCamera.transform.Copy());
-            lineRenderer.positionCount = positions.Count;
-            lineRenderer.SetPosition(positions.Count - 1, positions[positions.Count - 1].position);
+            
             GameObject tempModel = GameObject.Instantiate(Lens, lineRenderer.gameObject.transform, true);
             tempModel.layer = LayerMask.NameToLayer("UI");
 
+            UpdateLineRenderer();
         }
 
+        public void UpdateLineRenderer()
+        {
+            if (positions.Count == 0) { lineRenderer.positionCount = 0; return; }
+            
+            var (curveX,curveY,curveZ,_,_,_) = CreateCurves();
+            float lasttime = curveX.keys[curveX.length - 1].time;
+            int countPoints = positions.Count * 10;
+            float fraction = lasttime / countPoints;
+            lineRenderer.positionCount = countPoints;
+            for (int i = 0; i < countPoints; i++)
+            {
+                lineRenderer.SetPosition(i, new Vector3(curveX.Evaluate(fraction * i), curveY.Evaluate(fraction * i), curveZ.Evaluate(fraction * i)));
+            }
+            
+        }
         
         public override void OnLateUpdate()
         {
@@ -98,16 +123,40 @@ namespace CameraAnimation
 
         public AnimationClip CreateClip()
         {
+            
+            AnimationCurve curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ;
+
+            (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ) = CreateCurves();
+
+
             AnimationClip clip = new AnimationClip();
             clip.legacy = true;
+
+            var type = UnhollowerRuntimeLib.Il2CppType.Of<Transform>();
+            clip.SetCurve("", type, "localPosition.x", curveX);
+            clip.SetCurve("", type, "localPosition.y", curveY);
+            clip.SetCurve("", type, "localPosition.z", curveZ);
+
+            clip.SetCurve("", type, "localEulerAngles.x", curveRotX);
+            clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
+            clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
+
+            //clip.EnsureQuaternionContinuity();
+
+
+            return clip;
+
+
+        }
+
+        private (AnimationCurve curveX, AnimationCurve curveY, AnimationCurve curveZ, AnimationCurve curveRotX, AnimationCurve curveRotY, AnimationCurve curveRotZ) CreateCurves()
+        {
             AnimationCurve curveX = new AnimationCurve();
             AnimationCurve curveY = new AnimationCurve();
             AnimationCurve curveZ = new AnimationCurve();
-
             AnimationCurve curveRotX = new AnimationCurve();
             AnimationCurve curveRotY = new AnimationCurve();
             AnimationCurve curveRotZ = new AnimationCurve();
-
             float time = 0;
             for (int i = 0; i < positions.Count; i++)
             {
@@ -121,9 +170,9 @@ namespace CameraAnimation
                 if (i != 0)
                 {
                     //correct rotations to be negative if needed and writeback for next itteration
-                    float lastRotX = positions[i-1].eulerAngles.x;
-                    float lastRotY = positions[i-1].eulerAngles.y;
-                    float lastRotZ = positions[i-1].eulerAngles.z;
+                    float lastRotX = positions[i - 1].eulerAngles.x;
+                    float lastRotY = positions[i - 1].eulerAngles.y;
+                    float lastRotZ = positions[i - 1].eulerAngles.z;
 
                     if (Mathf.Abs(lastRotX - rotX) > 180)
                     {
@@ -147,26 +196,12 @@ namespace CameraAnimation
                 curveRotY.AddKey(time, rotY);
                 curveRotZ.AddKey(time, rotZ);
 
-                time += Mathf.Lerp(0.5f, 5f, 1-speed);
-
+                time += Mathf.Lerp(0.5f, 5f, 1 - speed);
+                
             }
-            var type = UnhollowerRuntimeLib.Il2CppType.Of<Transform>();
-            clip.SetCurve("", type, "localPosition.x", curveX);
-            clip.SetCurve("", type, "localPosition.y", curveY);
-            clip.SetCurve("", type, "localPosition.z", curveZ);
-
-            clip.SetCurve("", type, "localEulerAngles.x", curveRotX);
-            clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
-            clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
-
-            //clip.EnsureQuaternionContinuity();
-
-
-
-            return clip;
-
-
+            return (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ);
         }
+
         public void PlayAnimation()
         {
             anim = CloneVideoCamera.GetComponent<Animation>();

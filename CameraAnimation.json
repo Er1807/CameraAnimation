@@ -1,7 +1,7 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "1.0.1",
+  "modversion": "1.0.2",
   "vrchatversion": "1132",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
@@ -14,7 +14,7 @@
     "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)",
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.0.1/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.0.2/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
   "changelog": "-",
   "embedcolor": "7F60CA"
