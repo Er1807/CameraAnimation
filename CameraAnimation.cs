@@ -175,17 +175,17 @@ namespace CameraAnimation
                     float lastRotY = positions[i - 1].eulerAngles.y;
                     float lastRotZ = positions[i - 1].eulerAngles.z;
 
-                    if (Mathf.Abs(lastRotX - rotX) > 180)
+                    if (Mathf.Abs(lastRotX - rotX) > 180 && Mathf.Abs(lastRotX - rotX) <= 360)
                     {
                         rotX = 360 - rotX;
                         positions[i].eulerAngles.x = rotX;
                     }
-                    if (Mathf.Abs(lastRotY - rotY) > 180)
+                    if (Mathf.Abs(lastRotY - rotY) > 180 && Mathf.Abs(lastRotY - rotY) <= 360)
                     {
                         rotY = 360 - rotY;
                         positions[i].eulerAngles.y = rotY;
                     }
-                    if (Mathf.Abs(lastRotZ - rotZ) > 180)
+                    if (Mathf.Abs(lastRotZ - rotZ) > 180 && Mathf.Abs(lastRotZ - rotZ) <= 360)
                     {
                         rotZ = 360 - rotZ;
                         positions[i].eulerAngles.z = rotZ;
