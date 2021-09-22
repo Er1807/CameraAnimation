@@ -3,10 +3,9 @@ using CameraAnimation;
 using MelonLoader;
 using System.Collections.Generic;
 using UnityEngine;
-using VRChatUtilityKit.Utilities;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.4", "Eric van Fandenfart")]
-[assembly: MelonAdditionalDependencies("VRChatUtilityKit", "ActionMenuApi")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.5", "Eric van Fandenfart")]
+[assembly: MelonAdditionalDependencies("ActionMenuApi")]
 [assembly: MelonGame]
 
 namespace CameraAnimation
@@ -21,6 +20,7 @@ namespace CameraAnimation
         private bool animationActive = false;
         private LineRenderer lineRenderer;
         private GameObject Lens;
+        private GameObject PhotoCameraClone;
         private Animation anim = null;
 
         public override void OnApplicationStart()
@@ -28,7 +28,7 @@ namespace CameraAnimation
             VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main,
                 "Camera Animation",
                 delegate {
-                    MelonLogger.Msg("Camera Animation Menu Opened");
+                    FindCamera();
                     CustomSubMenu.AddButton("Save Pos", () => AddCurrentPositionToList());
                     CustomSubMenu.AddButton("Delete last Pos", () => RemoveLastPosition());
                     CustomSubMenu.AddButton("Play Anim", () => PlayAnimation());
@@ -46,25 +46,18 @@ namespace CameraAnimation
                 }
             );
             MelonLogger.Msg("Actionmenu initialised");
-            VRCUtils.OnUiManagerInit += Init;
         }
 
         
-
-        private void Init()
-        {
-            FindCamera();
-
-        }
-
         private void FindCamera()
         {
+            if (PhotoCameraClone != null) return;
             PhotoCamera = GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera");
             Lens = GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera/camera_lens_mesh");
-            GameObject vidCam = GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera/VideoCamera");
-            if (vidCam != null)
-                CloneVideoCamera = GameObject.Instantiate(vidCam);
-
+            PhotoCameraClone = GameObject.Instantiate(GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera"));
+            
+            CloneVideoCamera = PhotoCameraClone.transform.Find("VideoCamera").gameObject;
+            CloneVideoCamera.SetActive(true);
             lineRenderer = new GameObject("CameraPath") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
             lineRenderer.startWidth = 0.05f;
             lineRenderer.positionCount = 0;
@@ -79,7 +72,6 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            if (PhotoCamera == null) FindCamera();
             positions.Add(PhotoCamera.transform.Copy());
             
             GameObject tempModel = GameObject.Instantiate(Lens, lineRenderer.gameObject.transform, true);
@@ -106,18 +98,16 @@ namespace CameraAnimation
         
         public override void OnLateUpdate()
         {
-            if (CloneVideoCamera == null) FindCamera();
-
             if (CloneVideoCamera == null) return;
 
             if (animationActive)
             {
-                CloneVideoCamera.active = true;
+                PhotoCameraClone.active = true;
                 if (!anim.isPlaying) animationActive = false;
             }
             else
             {
-                CloneVideoCamera.active = false;
+                PhotoCameraClone.active = false;
             }
                 
         }
@@ -142,7 +132,7 @@ namespace CameraAnimation
             clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
             clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
 
-            //clip.EnsureQuaternionContinuity();
+            clip.EnsureQuaternionContinuity();
 
 
             return clip;
@@ -168,30 +158,49 @@ namespace CameraAnimation
                 float rotX = positions[i].eulerAngles.x;
                 float rotY = positions[i].eulerAngles.y;
                 float rotZ = positions[i].eulerAngles.z;
-                if (i != 0)
+                if (i == 0)
+                {
+                    positions[i].eulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                }else if (i != 0 && !positions[i].corrected)
                 {
                     //correct rotations to be negative if needed and writeback for next itteration
                     float lastRotX = positions[i - 1].eulerAngles.x;
                     float lastRotY = positions[i - 1].eulerAngles.y;
                     float lastRotZ = positions[i - 1].eulerAngles.z;
 
-                    if (Mathf.Abs(lastRotX - rotX) > 180 && Mathf.Abs(lastRotX - rotX) <= 360)
-                    {
-                        rotX = 360 - rotX;
-                        positions[i].eulerAngles.x = rotX;
-                    }
-                    if (Mathf.Abs(lastRotY - rotY) > 180 && Mathf.Abs(lastRotY - rotY) <= 360)
-                    {
-                        rotY = 360 - rotY;
-                        positions[i].eulerAngles.y = rotY;
-                    }
-                    if (Mathf.Abs(lastRotZ - rotZ) > 180 && Mathf.Abs(lastRotZ - rotZ) <= 360)
-                    {
-                        rotZ = 360 - rotZ;
-                        positions[i].eulerAngles.z = rotZ;
-                    }
+                    float lastRotXAdj = positions[i - 1].eulerAnglesCorrected.x;
+                    float lastRotYAdj = positions[i - 1].eulerAnglesCorrected.y;
+                    float lastRotZAdj = positions[i - 1].eulerAnglesCorrected.z;
 
-                }
+                    float diffX = rotX - lastRotX;
+                    float diffY = rotY - lastRotY;
+                    float diffZ = rotZ - lastRotZ;
+
+                    if (diffX > 180)
+                        diffX = diffX - 360;
+                    if (diffY > 180)
+                        diffY = diffY - 360;
+                    if (diffZ > 180)
+                        diffZ = diffZ - 360;
+
+                    if (diffX < -180)
+                        diffX = 360 + diffX;
+                    if (diffY < -180)
+                        diffY = 360 + diffY;
+                    if (diffZ < -180)
+                        diffZ = 360 + diffZ;
+
+                    rotX = lastRotXAdj + diffX;
+                    rotY = lastRotYAdj + diffY;
+                    rotZ = lastRotZAdj + diffZ;
+
+
+                    positions[i].eulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                } // 342 -> 60   360+60 = 420
+                positions[i].corrected = true;
+                rotX = positions[i].eulerAnglesCorrected.x;
+                rotY = positions[i].eulerAnglesCorrected.y;
+                rotZ = positions[i].eulerAnglesCorrected.z;
 
                 curveRotX.AddKey(time, rotX);
                 curveRotY.AddKey(time, rotY);
@@ -205,9 +214,9 @@ namespace CameraAnimation
 
         public void PlayAnimation()
         {
-            anim = CloneVideoCamera.GetComponent<Animation>();
+            anim = PhotoCameraClone.GetComponent<Animation>();
             if(anim == null)
-                anim = CloneVideoCamera.AddComponent<Animation>();
+                anim = PhotoCameraClone.AddComponent<Animation>();
 
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
@@ -223,6 +232,8 @@ namespace CameraAnimation
         public Quaternion rotation;
         public Vector3 localScale;
         public Vector3 eulerAngles;
+        public bool corrected;
+        public Vector3 eulerAnglesCorrected;
     }
 
     public static class TransformSerializationExtension
