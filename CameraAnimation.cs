@@ -17,7 +17,7 @@ namespace CameraAnimation
         private GameObject CloneVideoCamera;
         private readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
-        private bool animationActive = false;
+        private bool loopMode = false;
         private LineRenderer lineRenderer;
         private GameObject Lens;
         private GameObject PhotoCameraClone;
@@ -32,6 +32,7 @@ namespace CameraAnimation
                     CustomSubMenu.AddButton("Save Pos", () => AddCurrentPositionToList());
                     CustomSubMenu.AddButton("Delete last Pos", () => RemoveLastPosition());
                     CustomSubMenu.AddButton("Play Anim", () => PlayAnimation());
+                    CustomSubMenu.AddButton("Stop Anim", () => StopAnimation());
                     CustomSubMenu.AddButton("Clear Anim", () => 
                     { 
                         positions.Clear(); 
@@ -42,13 +43,15 @@ namespace CameraAnimation
                         }
                         
                     });
-                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, 0.5f);
+                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
+                    CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
                 }
             );
             MelonLogger.Msg("Actionmenu initialised");
         }
 
         
+
         private void FindCamera()
         {
             if (PhotoCameraClone != null) return;
@@ -89,7 +92,7 @@ namespace CameraAnimation
             int countPoints = positions.Count * 10;
             float fraction = lasttime / countPoints;
             lineRenderer.positionCount = countPoints;
-            for (int i = 0; i < countPoints; i++)
+            for (int i = 0; i <= countPoints; i++)
             {
                 lineRenderer.SetPosition(i, new Vector3(curveX.Evaluate(fraction * i), curveY.Evaluate(fraction * i), curveZ.Evaluate(fraction * i)));
             }
@@ -98,15 +101,21 @@ namespace CameraAnimation
         
         public override void OnLateUpdate()
         {
-            if (CloneVideoCamera == null) return;
+            if (CloneVideoCamera == null || anim == null) return;
 
-            if (animationActive)
+
+
+
+            if (anim.isPlaying)
             {
                 PhotoCameraClone.active = true;
-                if (!anim.isPlaying) animationActive = false;
             }
-            else
+            else if (loopMode)
             {
+                PhotoCameraClone.active = true;
+                PlayAnimation();
+            }
+            else { 
                 PhotoCameraClone.active = false;
             }
                 
@@ -149,6 +158,10 @@ namespace CameraAnimation
             AnimationCurve curveRotY = new AnimationCurve();
             AnimationCurve curveRotZ = new AnimationCurve();
             float time = 0;
+
+            if (loopMode)
+                positions.Add(positions[0].Clone());
+
             for (int i = 0; i < positions.Count; i++)
             {
                 curveX.AddKey(time, positions[i].position.x);
@@ -209,6 +222,9 @@ namespace CameraAnimation
                 time += Mathf.Lerp(0.5f, 5f, 1 - speed);
                 
             }
+            if (loopMode)
+                positions.RemoveAt(positions.Count - 1);
+
             return (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ);
         }
 
@@ -221,11 +237,17 @@ namespace CameraAnimation
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
             anim.Play(clip.name);
-            animationActive = true;
         }
-    
-    }
+        private void StopAnimation()
+        {
+            if (anim != null)
+            {
+                anim.Stop();
+            }
+        }
 
+    }
+    
     public class StoreTransform
     {
         public Vector3 position;
@@ -234,6 +256,17 @@ namespace CameraAnimation
         public Vector3 eulerAngles;
         public bool corrected;
         public Vector3 eulerAnglesCorrected;
+
+        public StoreTransform Clone()
+        {
+            return new StoreTransform()
+            {
+                position = position,
+                rotation = rotation,
+                localScale = localScale,
+                eulerAngles = eulerAngles
+            };
+        }
     }
 
     public static class TransformSerializationExtension
