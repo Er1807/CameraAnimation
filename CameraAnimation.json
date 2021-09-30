@@ -1,7 +1,7 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "1.0.5",
+  "modversion": "1.0.6",
   "vrchatversion": "1132",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
@@ -13,8 +13,8 @@
   "requirements": [
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.0.5/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/1.0.6/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
-  "changelog": "Videocamera is now visible\nFinally fixed rotation being not weird\nRemoved VRChatUtilityKit dependency",
+  "changelog": "Added loop mode",
   "embedcolor": "7F60CA"
 }
