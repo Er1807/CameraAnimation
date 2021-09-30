@@ -4,7 +4,7 @@ using MelonLoader;
 using System.Collections.Generic;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.5", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.6", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi")]
 [assembly: MelonGame]
 
@@ -91,7 +91,7 @@ namespace CameraAnimation
             float lasttime = curveX.keys[curveX.length - 1].time;
             int countPoints = positions.Count * 10;
             float fraction = lasttime / countPoints;
-            lineRenderer.positionCount = countPoints;
+            lineRenderer.positionCount = countPoints+1;
             for (int i = 0; i <= countPoints; i++)
             {
                 lineRenderer.SetPosition(i, new Vector3(curveX.Evaluate(fraction * i), curveY.Evaluate(fraction * i), curveZ.Evaluate(fraction * i)));
