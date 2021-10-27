@@ -3,8 +3,10 @@ using CameraAnimation;
 using MelonLoader;
 using System.Collections.Generic;
 using UnityEngine;
+using VRC.UserCamera;
+using VRCSDK2;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.0.6", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi")]
 [assembly: MelonGame]
 
@@ -13,22 +15,34 @@ namespace CameraAnimation
 
     public class CameraAnimationMod : MelonMod
     {
-        private GameObject PhotoCamera;
-        private GameObject CloneVideoCamera;
+        private GameObject originalCamera;
+        private GameObject originalVideoCamera;
         private readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
         private bool loopMode = false;
         private LineRenderer lineRenderer;
-        private GameObject Lens;
-        private GameObject PhotoCameraClone;
         private Animation anim = null;
+        private bool shouldBePlaying = false;
 
         public override void OnApplicationStart()
         {
             VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main,
                 "Camera Animation",
                 delegate {
-                    FindCamera();
+
+                    originalCamera = GameObject.Find("_Application/PhotoCamera") ?? GameObject.Find("_Application/UserCamera/PhotoCamera") ?? GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera");
+                    if (originalCamera == null) return;
+
+                    originalVideoCamera = originalCamera.transform.Find("VideoCamera").gameObject;
+
+                    if (lineRenderer == null)
+                    {
+                        lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
+                        lineRenderer.SetWidth(0.05f, 0.05f);
+                        GameObject.DontDestroyOnLoad(lineRenderer);
+                    }
+
+                    CustomSubMenu.AddButton("Update Linerenderer", () => UpdateLineRenderer());
                     CustomSubMenu.AddButton("Save Pos", () => AddCurrentPositionToList());
                     CustomSubMenu.AddButton("Delete last Pos", () => RemoveLastPosition());
                     CustomSubMenu.AddButton("Play Anim", () => PlayAnimation());
@@ -52,19 +66,7 @@ namespace CameraAnimation
 
         
 
-        private void FindCamera()
-        {
-            if (PhotoCameraClone != null) return;
-            PhotoCamera = GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera");
-            Lens = GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera/camera_lens_mesh");
-            PhotoCameraClone = GameObject.Instantiate(GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera"));
-            
-            CloneVideoCamera = PhotoCameraClone.transform.Find("VideoCamera").gameObject;
-            CloneVideoCamera.SetActive(true);
-            lineRenderer = new GameObject("CameraPath") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
-            lineRenderer.startWidth = 0.05f;
-            lineRenderer.positionCount = 0;
-        }
+        
         public void RemoveLastPosition()
         {
             if (positions.Count == 0) return;
@@ -75,11 +77,18 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            positions.Add(PhotoCamera.transform.Copy());
-            
-            GameObject tempModel = GameObject.Instantiate(Lens, lineRenderer.gameObject.transform, true);
-            tempModel.layer = LayerMask.NameToLayer("UI");
+            var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
+            UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
 
+            var photoCameraClone =  GameObject.Instantiate(originalCamera, lineRenderer.transform);
+            photoCameraClone.GetComponent<Camera>().enabled = false;
+            photoCameraClone.GetComponent<VRC_Pickup>().pickupable = true;
+            photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
+            photoCameraClone.transform.position = originalCamera.transform.position;
+            photoCameraClone.transform.rotation = originalCamera.transform.rotation;
+            positions.Add(new StoreTransform(photoCameraClone));
+
+            UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
         }
 
@@ -101,22 +110,24 @@ namespace CameraAnimation
         
         public override void OnLateUpdate()
         {
-            if (CloneVideoCamera == null || anim == null) return;
+            if (anim == null || originalCamera == null) return;
 
 
 
 
             if (anim.isPlaying)
             {
-                PhotoCameraClone.active = true;
+                originalVideoCamera.active = true;
             }
             else if (loopMode)
             {
-                PhotoCameraClone.active = true;
+                originalVideoCamera.active = true;
                 PlayAnimation();
             }
-            else { 
-                PhotoCameraClone.active = false;
+            else if(shouldBePlaying){
+                originalVideoCamera.active = false;
+                shouldBePlaying = false;
+                UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.Attached;
             }
                 
         }
@@ -160,7 +171,7 @@ namespace CameraAnimation
             float time = 0;
 
             if (loopMode)
-                positions.Add(positions[0].Clone());
+                positions.Add(new StoreTransform(positions[0].photocamera));
 
             for (int i = 0; i < positions.Count; i++)
             {
@@ -174,7 +185,7 @@ namespace CameraAnimation
                 if (i == 0)
                 {
                     positions[i].eulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
-                }else if (i != 0 && !positions[i].corrected)
+                }else if (i != 0)
                 {
                     //correct rotations to be negative if needed and writeback for next itteration
                     float lastRotX = positions[i - 1].eulerAngles.x;
@@ -210,7 +221,6 @@ namespace CameraAnimation
 
                     positions[i].eulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
                 } // 342 -> 60   360+60 = 420
-                positions[i].corrected = true;
                 rotX = positions[i].eulerAnglesCorrected.x;
                 rotY = positions[i].eulerAnglesCorrected.y;
                 rotZ = positions[i].eulerAnglesCorrected.z;
@@ -230,13 +240,15 @@ namespace CameraAnimation
 
         public void PlayAnimation()
         {
-            anim = PhotoCameraClone.GetComponent<Animation>();
+            UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
+            anim = originalCamera.GetComponent<Animation>();
             if(anim == null)
-                anim = PhotoCameraClone.AddComponent<Animation>();
+                anim = originalCamera.AddComponent<Animation>();
 
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
             anim.Play(clip.name);
+            shouldBePlaying = true;
         }
         private void StopAnimation()
         {
@@ -250,42 +262,14 @@ namespace CameraAnimation
     
     public class StoreTransform
     {
-        public Vector3 position;
-        public Quaternion rotation;
-        public Vector3 localScale;
-        public Vector3 eulerAngles;
-        public bool corrected;
+        public GameObject photocamera;
+        public Vector3 position => photocamera.transform.position;
+        public Vector3 eulerAngles => photocamera.transform.eulerAngles;
         public Vector3 eulerAnglesCorrected;
 
-        public StoreTransform Clone()
+        public StoreTransform(GameObject camera)
         {
-            return new StoreTransform()
-            {
-                position = position,
-                rotation = rotation,
-                localScale = localScale,
-                eulerAngles = eulerAngles
-            };
-        }
-    }
-
-    public static class TransformSerializationExtension
-    {
-        public static StoreTransform Copy(this Transform aTransform)
-        {
-            return new StoreTransform()
-            {
-                position = aTransform.position,
-                rotation = aTransform.rotation,
-                localScale = aTransform.localScale,
-                eulerAngles = aTransform.rotation.eulerAngles
-            };
-        }
-        public static void FromCopy(this Transform aTransform, StoreTransform newPos)
-        {
-            aTransform.position = newPos.position;
-            aTransform.rotation = newPos.rotation;
-            aTransform.localScale = newPos.localScale;
-        }
+            photocamera = camera;
+        } 
     }
 }
