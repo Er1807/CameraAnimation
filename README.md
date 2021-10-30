@@ -2,7 +2,7 @@
 Create animations for recording scenes in VRChat. Only usable with VR in the current version
 
 
-Requires [VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit) and [ActionMenuApi](https://github.com/gompocp/ActionMenuApi)
+Requires [VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit) and [ActionMenuApi](https://github.com/gompoc/VRChatMods/tree/master/ActionMenuApi)
 
 All controls can be found in the actionmenu
 
