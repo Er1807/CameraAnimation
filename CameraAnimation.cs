@@ -3,6 +3,7 @@ using CameraAnimation;
 using MelonLoader;
 using System.Collections.Generic;
 using UnityEngine;
+using VRC;
 using VRC.UserCamera;
 using VRCSDK2;
 
@@ -20,6 +21,7 @@ namespace CameraAnimation
         private readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
         private bool loopMode = false;
+        private bool SyncCameraIcon = true;
         private LineRenderer lineRenderer;
         private Animation anim = null;
         private bool shouldBePlaying = false;
@@ -59,6 +61,11 @@ namespace CameraAnimation
                     });
                     CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
                     CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
+                    CustomSubMenu.AddToggle("Sync Camera\nIcon", SyncCameraIcon, (x) => {
+                        SyncCameraIcon = x;
+                        if(Player.prop_Player_0 != null)
+                            Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = SyncCameraIcon;
+                     });
                 }
             );
             MelonLogger.Msg("Actionmenu initialised");
@@ -81,6 +88,7 @@ namespace CameraAnimation
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
 
             var photoCameraClone =  GameObject.Instantiate(originalCamera, lineRenderer.transform);
+            photoCameraClone.GetComponentInChildren<MeshRenderer>().gameObject.layer = LayerMask.NameToLayer("UI");
             photoCameraClone.GetComponent<Camera>().enabled = false;
             photoCameraClone.GetComponent<VRC_Pickup>().pickupable = true;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
