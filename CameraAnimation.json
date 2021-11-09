@@ -1,8 +1,8 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "1.0.6",
-  "vrchatversion": "1132",
+  "modversion": "1.1.0",
+  "vrchatversion": "1149",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
   "author": "Eric van Fandenfart",
@@ -13,8 +13,8 @@
   "requirements": [
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/1.0.6/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.1.0/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
-  "changelog": "Added loop mode",
+  "changelog": "Added 1149 Support and ability to make camera position sync while playing animations",
   "embedcolor": "7F60CA"
 }
