@@ -7,7 +7,7 @@ using VRC;
 using VRC.UserCamera;
 using VRCSDK2;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.1", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi")]
 [assembly: MelonGame]
 
@@ -22,6 +22,7 @@ namespace CameraAnimation
         private float speed = 0.5f;
         private bool loopMode = false;
         private bool SyncCameraIcon = true;
+        private bool ConstantSpeed = false;
         private LineRenderer lineRenderer;
         private Animation anim = null;
         private bool shouldBePlaying = false;
@@ -59,13 +60,19 @@ namespace CameraAnimation
                         }
                         
                     });
-                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
-                    CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
-                    CustomSubMenu.AddToggle("Sync Camera\nIcon", SyncCameraIcon, (x) => {
-                        SyncCameraIcon = x;
-                        if(Player.prop_Player_0 != null)
-                            Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = SyncCameraIcon;
-                     });
+                    CustomSubMenu.AddSubMenu("Settings",
+                        delegate {
+                            CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
+                            CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
+                            CustomSubMenu.AddToggle("Sync Camera\nIcon", SyncCameraIcon, (x) => {
+                                SyncCameraIcon = x;
+                                if (Player.prop_Player_0 != null)
+                                    Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = SyncCameraIcon;
+                            });
+                            CustomSubMenu.AddToggle("Constant\nSpeed", ConstantSpeed, (x) => { ConstantSpeed = x; });
+
+                        });
+                    
                 }
             );
             MelonLogger.Msg("Actionmenu initialised");
@@ -162,7 +169,6 @@ namespace CameraAnimation
 
             clip.EnsureQuaternionContinuity();
 
-
             return clip;
 
 
@@ -236,9 +242,15 @@ namespace CameraAnimation
                 curveRotX.AddKey(time, rotX);
                 curveRotY.AddKey(time, rotY);
                 curveRotZ.AddKey(time, rotZ);
-
-                time += Mathf.Lerp(0.5f, 5f, 1 - speed);
-                
+                if(i < positions.Count - 1 && ConstantSpeed)
+                {
+                    float distance = Vector3.Distance(positions[i].position, positions[i+1].position);
+                    time += distance * Mathf.Lerp(0.2f, 5f, 1 - speed);
+                }
+                else
+                {
+                    time += Mathf.Lerp(0.5f, 5f, 1 - speed);
+                }
             }
             if (loopMode)
                 positions.RemoveAt(positions.Count - 1);
