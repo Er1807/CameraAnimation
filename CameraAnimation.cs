@@ -7,7 +7,7 @@ using VRC;
 using VRC.UserCamera;
 using VRCSDK2;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.1", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.2", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi")]
 [assembly: MelonGame]
 
@@ -21,8 +21,10 @@ namespace CameraAnimation
         private readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
         private bool loopMode = false;
-        private bool SyncCameraIcon = true;
-        private bool ConstantSpeed = false;
+        private bool syncCameraIcon = true;
+        private bool constantSpeed = false;
+        private bool showPath = true;
+        private bool videoCameraWasActive = false;
         private LineRenderer lineRenderer;
         private Animation anim = null;
         private bool shouldBePlaying = false;
@@ -58,24 +60,29 @@ namespace CameraAnimation
                         {
                             GameObject.Destroy(lineRenderer.transform.GetChild(i).gameObject);
                         }
-                        
+
+                        loopMode = false;
                     });
                     CustomSubMenu.AddSubMenu("Settings",
                         delegate {
                             CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
                             CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
-                            CustomSubMenu.AddToggle("Sync Camera\nIcon", SyncCameraIcon, (x) => {
-                                SyncCameraIcon = x;
+                            CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) => {
+                                syncCameraIcon = x;
                                 if (Player.prop_Player_0 != null)
-                                    Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = SyncCameraIcon;
+                                    Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = syncCameraIcon;
                             });
-                            CustomSubMenu.AddToggle("Constant\nSpeed", ConstantSpeed, (x) => { ConstantSpeed = x; });
+                            CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; });
+                            CustomSubMenu.AddToggle("Show\nPath", showPath, (x) => { 
+                                showPath = x;
+                                lineRenderer.enabled = showPath;
+                            });
 
                         });
                     
                 }
             );
-            MelonLogger.Msg("Actionmenu initialised");
+            LoggerInstance.Msg("Actionmenu initialised");
         }
 
         
@@ -140,7 +147,8 @@ namespace CameraAnimation
                 PlayAnimation();
             }
             else if(shouldBePlaying){
-                originalVideoCamera.active = false;
+                if(!videoCameraWasActive)
+                    originalVideoCamera.active = false;
                 shouldBePlaying = false;
                 UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.Attached;
             }
@@ -242,7 +250,7 @@ namespace CameraAnimation
                 curveRotX.AddKey(time, rotX);
                 curveRotY.AddKey(time, rotY);
                 curveRotZ.AddKey(time, rotZ);
-                if(i < positions.Count - 1 && ConstantSpeed)
+                if(i < positions.Count - 1 && constantSpeed)
                 {
                     float distance = Vector3.Distance(positions[i].position, positions[i+1].position);
                     time += distance * Mathf.Lerp(0.2f, 5f, 1 - speed);
@@ -260,6 +268,9 @@ namespace CameraAnimation
 
         public void PlayAnimation()
         {
+            if (!shouldBePlaying)
+                videoCameraWasActive = originalVideoCamera.active;
+            
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
             anim = originalCamera.GetComponent<Animation>();
             if(anim == null)
