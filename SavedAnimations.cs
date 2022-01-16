@@ -116,9 +116,7 @@ namespace CameraAnimation
             //https://flystone.tistory.com/138
             get
             {
-                TextEditor _textEditor = new TextEditor();
-                _textEditor.Paste();
-                return _textEditor.text;
+                return GUIUtility.systemCopyBuffer;
             }
             set
             {
