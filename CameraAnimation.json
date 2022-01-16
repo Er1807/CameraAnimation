@@ -1,7 +1,7 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "1.1.3",
+  "modversion": "1.1.5",
   "vrchatversion": "1160",
   "loaderversion": "v0.5.1",
   "modtype": "Mod",
@@ -14,7 +14,7 @@
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)",
     "[UIExpansionKit](https://github.com/knah/VRCMods#ui--kit)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.1.3/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.1.5/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
   "changelog": "Added Saveslots\nAdded Copy to/copy from Clipboard\nFixed lag issue in specific cases",
   "embedcolor": "7F60CA"

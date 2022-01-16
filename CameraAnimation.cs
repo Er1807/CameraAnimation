@@ -3,12 +3,11 @@ using CameraAnimation;
 using MelonLoader;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering.PostProcessing;
 using VRC;
 using VRC.UserCamera;
 using VRCSDK2;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.4", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.5", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonGame]
 
@@ -135,7 +134,6 @@ namespace CameraAnimation
             var photoCameraClone = GameObject.Instantiate(originalCamera, lineRenderer.transform);
             photoCameraClone.GetComponentInChildren<MeshRenderer>().gameObject.layer = LayerMask.NameToLayer("UI");
             photoCameraClone.GetComponent<Camera>().enabled = false;
-            photoCameraClone.GetComponent<PostProcessLayer>().enabled = false;
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
             photoCameraClone.GetComponent<VRC_Pickup>().pickupable = true;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
