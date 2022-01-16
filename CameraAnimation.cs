@@ -8,7 +8,7 @@ using VRC;
 using VRC.UserCamera;
 using VRCSDK2;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.2", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.3", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonGame]
 
