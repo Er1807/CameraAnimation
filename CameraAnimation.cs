@@ -1,13 +1,23 @@
 ﻿using ActionMenuApi.Api;
 using CameraAnimation;
 using MelonLoader;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using TMPro;
+using TouchCamera;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
 using VRC;
+using VRC.SDKBase;
 using VRC.UserCamera;
 using VRCSDK2;
+using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "1.1.5", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.0.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonGame]
 
@@ -29,17 +39,29 @@ namespace CameraAnimation
         private Animation anim = null;
         private bool shouldBePlaying = false;
 
-        private SavedAnimations savedAnimations= null;
 
+
+        private SavedAnimations savedAnimations = null;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public override void OnApplicationStart()
         {
+            if (MelonHandler.Mods.Any(x => x.Info.Name == "TouchCamera"))
+            {
+                AddTochCameraHook();
+            }
+            else
+            {
+                MelonCoroutines.Start(WaitForCamera());
+            }
+
             savedAnimations = new SavedAnimations(this);
             VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main,
                 "Camera Animation",
                 delegate
                 {
 
-                    originalCamera = GameObject.Find("_Application/PhotoCamera") ?? GameObject.Find("_Application/UserCamera/PhotoCamera") ?? GameObject.Find("_Application/TrackingVolume/PlayerObjects/UserCamera/PhotoCamera");
+                    originalCamera = UserCameraController.field_Internal_Static_UserCameraController_0.transform.Find("PhotoCamera").gameObject;
                     if (originalCamera == null) return;
 
                     originalVideoCamera = originalCamera.transform.Find("VideoCamera").gameObject;
@@ -82,23 +104,83 @@ namespace CameraAnimation
                         {
                             CustomSubMenu.AddButton("Save\nCurrent", () => savedAnimations.Save());
                             CustomSubMenu.AddButton("Load from Clipboard", () => savedAnimations.CopyFromClipBoard());
-                            CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard() );
+                            CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard());
                             foreach (string availableSave in savedAnimations.AvailableSaves)
                             {
                                 CustomSubMenu.AddSubMenu(availableSave,
-                                    delegate {
+                                    delegate
+                                    {
                                         CustomSubMenu.AddButton("Load", () => savedAnimations.Load(availableSave));
                                         CustomSubMenu.AddButton("Delete", () => savedAnimations.Delete(availableSave));
                                         CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(availableSave));
 
                                     });
                             }
-                            
+
                         });
 
                 }
             );
             LoggerInstance.Msg("Actionmenu initialised");
+        }
+
+        private IEnumerator WaitForCamera()
+        {
+            while (UserCameraController.field_Internal_Static_UserCameraController_0 == null)
+                yield return null;
+            var cameraobj = UserCameraController.field_Internal_Static_UserCameraController_0.transform;
+
+            while (cameraobj.Find("ViewFinder/PhotoControls/Primary /ControlGroup_Main/ControlGroup_Space/Scroll View/Viewport/Content/Attached/Icon")?.GetComponent<CanvasRenderer>()?.GetMaterial()?.shader == null)
+                yield return null;
+
+            TouchCameraMod_CameraReadyEvent();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void AddTochCameraHook()
+        {
+            TouchCameraMod.CameraReadyEvent += TouchCameraMod_CameraReadyEvent;
+        }
+
+        private void TouchCameraMod_CameraReadyEvent()
+        {
+
+            originalCamera = UserCameraController.field_Internal_Static_UserCameraController_0.transform.Find("PhotoCamera").gameObject;
+            originalVideoCamera = originalCamera.transform.Find("VideoCamera").gameObject;
+
+            if (lineRenderer == null)
+            {
+                lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
+                lineRenderer.SetWidth(0.05f, 0.05f);
+                GameObject.DontDestroyOnLoad(lineRenderer);
+            }
+
+            var cameraobj = UserCameraController.field_Internal_Static_UserCameraController_0.transform;
+            var buttonToClone = cameraobj.Find("ViewFinder/PhotoControls/Primary /ControlGroup_Main/Scroll View/Viewport/Content/Space/");
+            var copyMainButton = GameObject.Instantiate(buttonToClone, buttonToClone.parent);
+            copyMainButton.transform.SetSiblingIndex(4);
+            cameraobj.Find("ViewFinder/PhotoControls/Primary /ControlGroup_Main/Scroll View/Viewport/Content/Pins/").transform.SetSiblingIndex(7);
+            var menuToClone = cameraobj.Find("ViewFinder/PhotoControls/Primary /ControlGroup_Main/ControlGroup_Pins/");
+            var copyMenu = GameObject.Instantiate(menuToClone, menuToClone.parent);
+
+            copyMainButton.transform.Find("Text (TMP)").GetComponent<TextMeshProUGUI>().text = "Camera Animations";
+
+            copyMenu.transform.Find("Scroll View/Viewport/Content/0/Text (TMP)").GetComponent<TextMeshProUGUI>().text = "Add Pos";
+            copyMenu.transform.Find("Scroll View/Viewport/Content/1/Text (TMP)").GetComponent<TextMeshProUGUI>().text = "Play Animation";
+            copyMenu.transform.Find("Scroll View/Viewport/Content/2/Text (TMP)").GetComponent<TextMeshProUGUI>().text = "Delete Last Pos";
+
+            copyMenu.transform.Find("Scroll View/Viewport/Content/0").GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
+            copyMenu.transform.Find("Scroll View/Viewport/Content/1").GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
+            copyMenu.transform.Find("Scroll View/Viewport/Content/2").GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
+            copyMenu.transform.Find("Scroll View/Viewport/Content/0").GetComponent<Button>().onClick.AddListener(new Action(() => AddCurrentPositionToList()));
+            copyMenu.transform.Find("Scroll View/Viewport/Content/1").GetComponent<Button>().onClick.AddListener(new Action(() => PlayAnimation()));
+            copyMenu.transform.Find("Scroll View/Viewport/Content/2").GetComponent<Button>().onClick.AddListener(new Action(() => RemoveLastPosition()));
+
+            var cameraButton = copyMainButton.GetComponent<CameraButton>();
+
+            cameraButton.field_Public_CanvasGroup_0 = copyMenu.GetComponent<CanvasGroup>();
+            cameraButton.field_Public_GameObject_0 = copyMenu.gameObject;
+
         }
 
         public void ClearAnimation()
@@ -135,7 +217,7 @@ namespace CameraAnimation
             photoCameraClone.GetComponentInChildren<MeshRenderer>().gameObject.layer = LayerMask.NameToLayer("UI");
             photoCameraClone.GetComponent<Camera>().enabled = false;
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
-            photoCameraClone.GetComponent<VRC_Pickup>().pickupable = true;
+            photoCameraClone.GetComponent<VRC.SDKBase.VRC_Pickup>().pickupable = true;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
             photoCameraClone.transform.position = position;
