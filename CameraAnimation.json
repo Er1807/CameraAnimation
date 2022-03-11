@@ -1,9 +1,9 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "1.1.5",
-  "vrchatversion": "1160",
-  "loaderversion": "v0.5.1",
+  "modversion": "2.0.1",
+  "vrchatversion": "1171",
+  "loaderversion": "v0.5.3",
   "modtype": "Mod",
   "author": "Eric van Fandenfart",
   "description": "Create animations for recording scenes in VRChat. Only usable with VR in the current version.",
@@ -14,8 +14,8 @@
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)",
     "[UIExpansionKit](https://github.com/knah/VRCMods#ui--kit)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v1.1.5/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v2.0.1/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
-  "changelog": "Added Saveslots\nAdded Copy to/copy from Clipboard\nFixed lag issue in specific cases",
+  "changelog": "MArk Touchcamera as optional dependency",
   "embedcolor": "7F60CA"
 }
