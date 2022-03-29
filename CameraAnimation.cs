@@ -10,6 +10,7 @@ using TMPro;
 using TouchCamera;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using VRC;
 using VRC.SDKBase;
@@ -27,8 +28,40 @@ namespace CameraAnimation
 
     public class CameraAnimationMod : MelonMod
     {
-        private GameObject originalCamera;
-        private GameObject originalVideoCamera;
+        private GameObject originalCamera
+        {
+            get
+            {
+                UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
+                if (controller == null) return null;
+                foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
+                {
+                    var obj = prop.GetValue(controller) as GameObject;
+                    if (obj != null && obj.name == "PhotoCamera")
+                        return obj;
+                }
+
+                return null;
+            }
+        }
+
+        private GameObject originalVideoCamera
+        {
+            get
+            {
+                UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
+                if (controller == null) return null;
+                foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
+                {
+                    var obj = prop.GetValue(controller) as GameObject;
+                    if (obj != null && obj.name == "VideoCamera")
+                        return obj;
+                }
+
+                return null;
+            }
+        }
+
         public readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
         private bool loopMode = false;
@@ -62,10 +95,7 @@ namespace CameraAnimation
                 delegate
                 {
 
-                    originalCamera = UserCameraController.field_Internal_Static_UserCameraController_0.transform.Find("PhotoCamera").gameObject;
                     if (originalCamera == null) return;
-
-                    originalVideoCamera = originalCamera.transform.Find("VideoCamera").gameObject;
 
                     if (lineRenderer == null)
                     {
@@ -145,10 +175,6 @@ namespace CameraAnimation
 
         private void TouchCameraMod_CameraReadyEvent()
         {
-
-            originalCamera = UserCameraController.field_Internal_Static_UserCameraController_0.transform.Find("PhotoCamera").gameObject;
-            originalVideoCamera = originalCamera.transform.Find("VideoCamera").gameObject;
-
             if (lineRenderer == null)
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
@@ -292,7 +318,6 @@ namespace CameraAnimation
             clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
 
             clip.EnsureQuaternionContinuity();
-
             return clip;
 
 
@@ -396,6 +421,16 @@ namespace CameraAnimation
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
             anim.Play(clip.name);
+            if(MelonHandler.Mods.Any(x => x.Info.Name == "FreezeFrame"))
+            {
+                var cloneHolder = SceneManager.GetActiveScene().GetRootGameObjects().FirstOrDefault(x => x.name == "Avatar Clone Holder");
+                if (cloneHolder != null)
+                    foreach (var item in cloneHolder.GetComponentsInChildren<Animation>())
+                    {
+                        item.Stop();
+                    }
+            }
+
             shouldBePlaying = true;
         }
         private void StopAnimation()

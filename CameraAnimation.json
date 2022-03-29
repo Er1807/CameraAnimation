@@ -16,6 +16,6 @@
   ],
   "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v2.0.1/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
-  "changelog": "MArk Touchcamera as optional dependency",
+  "changelog": "Mark Touchcamera as optional dependency",
   "embedcolor": "7F60CA"
 }
