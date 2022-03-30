@@ -18,7 +18,7 @@ using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.0.1", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.1.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
