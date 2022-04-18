@@ -4,10 +4,12 @@ using MelonLoader;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TMPro;
 using TouchCamera;
+using UnhollowerRuntimeLib;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -18,7 +20,7 @@ using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.1.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.1.1", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
@@ -28,6 +30,31 @@ namespace CameraAnimation
 
     public class CameraAnimationMod : MelonMod
     {
+        private static AssetBundle iconsAssetBundle;
+        static CameraAnimationMod()
+        {
+            try
+            {
+                //Adapted from knah's JoinNotifier mod found here: https://github.com/knah/VRCMods/blob/master/JoinNotifier/JoinNotifierMod.cs 
+                using (var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("CameraAnimation.icons-camera"))
+                using (var tempStream = new MemoryStream((int)stream.Length))
+                {
+                    stream.CopyTo(tempStream);
+                    iconsAssetBundle = AssetBundle.LoadFromMemory_Internal(tempStream.ToArray(), 0);
+                    iconsAssetBundle.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Warning("Consider checking for newer version as mod possibly no longer working, Exception occured OnAppStart(): " + e.Message);
+            }
+        }
+
+        public Texture2D LoadImage(string name)
+        {
+            return iconsAssetBundle.LoadAsset_Internal($"Assets/icons-camera/{name}.png", Il2CppType.Of<Texture2D>()).Cast<Texture2D>();
+        }
+
         private GameObject originalCamera
         {
             get
@@ -90,7 +117,9 @@ namespace CameraAnimation
             }
 
             savedAnimations = new SavedAnimations(this);
-            VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main,
+            var icon = LoadImage("play");
+            icon.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+            AMUtils.AddToModsFolder(
                 "Camera Animation",
                 delegate
                 {
@@ -104,54 +133,55 @@ namespace CameraAnimation
                         GameObject.DontDestroyOnLoad(lineRenderer);
                     }
 
-                    CustomSubMenu.AddButton("Save Pos", AddCurrentPositionToList);
-                    CustomSubMenu.AddButton("Delete last Pos", RemoveLastPosition);
-                    CustomSubMenu.AddButton("Play Anim", PlayAnimation);
-                    CustomSubMenu.AddButton("Stop Anim", StopAnimation);
-                    CustomSubMenu.AddButton("Update Linerenderer", UpdateLineRenderer);
-                    CustomSubMenu.AddButton("Clear Anim", ClearAnimation);
+                    CustomSubMenu.AddButton("Save Pos", AddCurrentPositionToList, LoadImage("save pos"));
+                    CustomSubMenu.AddButton("Delete last Pos", RemoveLastPosition, LoadImage("delete last pos"));
+                    CustomSubMenu.AddButton("Play Anim", PlayAnimation, LoadImage("play"));
+                    CustomSubMenu.AddButton("Stop Anim", StopAnimation, LoadImage("stop"));
+                    CustomSubMenu.AddButton("Update Linerenderer", UpdateLineRenderer, LoadImage("update linerenderer"));
+                    CustomSubMenu.AddButton("Clear Anim", ClearAnimation, LoadImage("clear anim"));
                     CustomSubMenu.AddSubMenu("Settings",
                         delegate
                         {
-                            CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed);
-                            CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); });
+                            CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed, LoadImage("speed"));
+                            CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
                             CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) =>
                             {
                                 syncCameraIcon = x;
                                 if (Player.prop_Player_0 != null)
                                     Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = syncCameraIcon;
-                            });
-                            CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; });
+                            }, LoadImage("sync camera icon"));
+
+                            CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
                             CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
                             {
                                 showPath = x;
                                 lineRenderer.enabled = showPath;
-                            });
+                            }, LoadImage("show path"));
 
-                        });
+                        }, LoadImage("settings"));
 
                     CustomSubMenu.AddSubMenu("Saved",
                         delegate
                         {
-                            CustomSubMenu.AddButton("Save\nCurrent", () => savedAnimations.Save());
-                            CustomSubMenu.AddButton("Load from Clipboard", () => savedAnimations.CopyFromClipBoard());
-                            CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard());
+                            CustomSubMenu.AddButton("Save\nCurrent", () => savedAnimations.Save(), LoadImage("save current"));
+                            CustomSubMenu.AddButton("Load from Clipboard", () => savedAnimations.CopyFromClipBoard(), LoadImage("load from clipboard"));
+                            CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(), LoadImage("copy to clipboard"));
                             foreach (string availableSave in savedAnimations.AvailableSaves)
                             {
                                 CustomSubMenu.AddSubMenu(availableSave,
                                     delegate
                                     {
                                         CustomSubMenu.AddButton("Load", () => savedAnimations.Load(availableSave));
-                                        CustomSubMenu.AddButton("Delete", () => savedAnimations.Delete(availableSave));
-                                        CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(availableSave));
+                                        CustomSubMenu.AddButton("Delete", () => savedAnimations.Delete(availableSave), LoadImage("delete"));
+                                        CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(availableSave), LoadImage("copy to clipboard"));
 
-                                    });
+                                    }, LoadImage("save current"));
                             }
 
-                        });
+                        }, LoadImage("saved"));
 
                 }
-            );
+            , icon);
             LoggerInstance.Msg("Actionmenu initialised");
         }
 
