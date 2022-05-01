@@ -20,7 +20,7 @@ using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.1.1", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.1.2", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
@@ -119,70 +119,76 @@ namespace CameraAnimation
             savedAnimations = new SavedAnimations(this);
             var icon = LoadImage("play");
             icon.hideFlags |= HideFlags.DontUnloadUnusedAsset;
-            AMUtils.AddToModsFolder(
-                "Camera Animation",
+
+
+            var category = MelonPreferences.CreateCategory("Camera Animation");
+            MelonPreferences_Entry<bool> showInModMenu = category.CreateEntry("UseModMenu", false, "Use the AM Mods Category");
+            if (showInModMenu.Value)
+                AMUtils.AddToModsFolder("Camera Animation", CreateActionMenu, icon);
+            else
+                VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main, "Camera Animation", CreateActionMenu, icon);
+
+            LoggerInstance.Msg("Actionmenu initialised");
+        }
+
+        private void CreateActionMenu()
+        {
+            if (originalCamera == null) return;
+
+            if (lineRenderer == null)
+            {
+                lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
+                lineRenderer.positionCount = 0;
+                lineRenderer.SetWidth(0.05f, 0.05f);
+                GameObject.DontDestroyOnLoad(lineRenderer);
+            }
+
+            CustomSubMenu.AddButton("Save Pos", AddCurrentPositionToList, LoadImage("save pos"));
+            CustomSubMenu.AddButton("Delete last Pos", RemoveLastPosition, LoadImage("delete last pos"));
+            CustomSubMenu.AddButton("Play Anim", PlayAnimation, LoadImage("play"));
+            CustomSubMenu.AddButton("Stop Anim", StopAnimation, LoadImage("stop"));
+            CustomSubMenu.AddButton("Update Linerenderer", UpdateLineRenderer, LoadImage("update linerenderer"));
+            CustomSubMenu.AddButton("Clear Anim", ClearAnimation, LoadImage("clear anim"));
+            CustomSubMenu.AddSubMenu("Settings",
                 delegate
                 {
-
-                    if (originalCamera == null) return;
-
-                    if (lineRenderer == null)
+                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed, LoadImage("speed"));
+                    CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
+                    CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) =>
                     {
-                        lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
-                        lineRenderer.SetWidth(0.05f, 0.05f);
-                        GameObject.DontDestroyOnLoad(lineRenderer);
+                        syncCameraIcon = x;
+                        if (Player.prop_Player_0 != null)
+                            Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = syncCameraIcon;
+                    }, LoadImage("sync camera icon"));
+
+                    CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
+                    {
+                        showPath = x;
+                        lineRenderer.enabled = showPath;
+                    }, LoadImage("show path"));
+
+                }, LoadImage("settings"));
+
+            CustomSubMenu.AddSubMenu("Saved",
+                delegate
+                {
+                    CustomSubMenu.AddButton("Save\nCurrent", () => savedAnimations.Save(), LoadImage("save current"));
+                    CustomSubMenu.AddButton("Load from Clipboard", () => savedAnimations.CopyFromClipBoard(), LoadImage("load from clipboard"));
+                    CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(), LoadImage("copy to clipboard"));
+                    foreach (string availableSave in savedAnimations.AvailableSaves)
+                    {
+                        CustomSubMenu.AddSubMenu(availableSave,
+                            delegate
+                            {
+                                CustomSubMenu.AddButton("Load", () => savedAnimations.Load(availableSave), LoadImage("load"));
+                                CustomSubMenu.AddButton("Delete", () => savedAnimations.Delete(availableSave), LoadImage("delete"));
+                                CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(availableSave), LoadImage("copy to clipboard"));
+
+                            }, LoadImage("save current"));
                     }
 
-                    CustomSubMenu.AddButton("Save Pos", AddCurrentPositionToList, LoadImage("save pos"));
-                    CustomSubMenu.AddButton("Delete last Pos", RemoveLastPosition, LoadImage("delete last pos"));
-                    CustomSubMenu.AddButton("Play Anim", PlayAnimation, LoadImage("play"));
-                    CustomSubMenu.AddButton("Stop Anim", StopAnimation, LoadImage("stop"));
-                    CustomSubMenu.AddButton("Update Linerenderer", UpdateLineRenderer, LoadImage("update linerenderer"));
-                    CustomSubMenu.AddButton("Clear Anim", ClearAnimation, LoadImage("clear anim"));
-                    CustomSubMenu.AddSubMenu("Settings",
-                        delegate
-                        {
-                            CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed, LoadImage("speed"));
-                            CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
-                            CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) =>
-                            {
-                                syncCameraIcon = x;
-                                if (Player.prop_Player_0 != null)
-                                    Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = syncCameraIcon;
-                            }, LoadImage("sync camera icon"));
-
-                            CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
-                            CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
-                            {
-                                showPath = x;
-                                lineRenderer.enabled = showPath;
-                            }, LoadImage("show path"));
-
-                        }, LoadImage("settings"));
-
-                    CustomSubMenu.AddSubMenu("Saved",
-                        delegate
-                        {
-                            CustomSubMenu.AddButton("Save\nCurrent", () => savedAnimations.Save(), LoadImage("save current"));
-                            CustomSubMenu.AddButton("Load from Clipboard", () => savedAnimations.CopyFromClipBoard(), LoadImage("load from clipboard"));
-                            CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(), LoadImage("copy to clipboard"));
-                            foreach (string availableSave in savedAnimations.AvailableSaves)
-                            {
-                                CustomSubMenu.AddSubMenu(availableSave,
-                                    delegate
-                                    {
-                                        CustomSubMenu.AddButton("Load", () => savedAnimations.Load(availableSave));
-                                        CustomSubMenu.AddButton("Delete", () => savedAnimations.Delete(availableSave), LoadImage("delete"));
-                                        CustomSubMenu.AddButton("Copy to Clipboard", () => savedAnimations.CopyToClipBoard(availableSave), LoadImage("copy to clipboard"));
-
-                                    }, LoadImage("save current"));
-                            }
-
-                        }, LoadImage("saved"));
-
-                }
-            , icon);
-            LoggerInstance.Msg("Actionmenu initialised");
+                }, LoadImage("saved"));
         }
 
         private IEnumerator WaitForCamera()
