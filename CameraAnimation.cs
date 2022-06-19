@@ -20,7 +20,7 @@ using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.2.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
@@ -215,6 +215,7 @@ namespace CameraAnimation
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
                 lineRenderer.SetWidth(0.05f, 0.05f);
+                lineRenderer.positionCount = 0;
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
 
