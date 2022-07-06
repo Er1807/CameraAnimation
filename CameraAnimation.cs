@@ -27,7 +27,6 @@ using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
 
 namespace CameraAnimation
 {
-
     public class CameraAnimationMod : MelonMod
     {
         private static AssetBundle iconsAssetBundle;
@@ -101,11 +100,23 @@ namespace CameraAnimation
         private Animation anim = null;
         private bool shouldBePlaying = false;
 
+        // whether or not the NEXT and FOLLOWING camera objects should be "pickupable"
+        // changes to this value ONLY affect the following spawned cameras
+        // to update all cameras with the new value, call UpdatePickupable()
         private bool allowKeyCameraPickup = false;
+        
 
+        // KEYING
+        // whether or not the FOLLOWING keyframes contain position keys
         private bool keyPosition = true;
+        // whether or not the FOLLOWING keyframes contain rotation keys
         private bool keyRotation = true;
+        // whether or not the FOLLOWING keyframes contain zoom keys
         private bool keyZoom = true;
+        private float defaultMaxTimeBetweenKeyFrames = 5f;
+        private float maxTimeBetweenKeyFrames = 5f;
+        private float defaultMinTimeBetweenKeyFrames = 0.2f;
+        private float minTimeBetweenKeyFrames = 0.2f;
 
         private SavedAnimations savedAnimations = null;
 
@@ -167,7 +178,7 @@ namespace CameraAnimation
                     }, LoadImage("sync camera icon"));
 
                     CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
-                    CustomSubMenu.AddToggle("Enable\nKey Pickup", allowKeyCameraPickup, (x) => { allowKeyCameraPickup = x; }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Enable\nKey Pickup", allowKeyCameraPickup, (x) => { allowKeyCameraPickup = x; UpdatePickupable(); }, LoadImage("constant speed"));
                     CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
                     {
                         showPath = x;
@@ -182,6 +193,8 @@ namespace CameraAnimation
                     CustomSubMenu.AddToggle("Position", keyPosition, (x) => { keyPosition = x; }, LoadImage("save pos"));
                     CustomSubMenu.AddToggle("Rotation", keyRotation, (x) => { keyRotation = x;  }, LoadImage("save pos"));
                     CustomSubMenu.AddToggle("Zoom", keyZoom, (x) => { keyZoom = x;  }, LoadImage("save pos"));
+                    CustomSubMenu.AddRadialPuppet("Max Key Length", (x) => maxTimeBetweenKeyFrames = x * (defaultMaxTimeBetweenKeyFrames * 10 * 2), defaultMaxTimeBetweenKeyFrames / 20, LoadImage("speed"));
+                    CustomSubMenu.AddRadialPuppet("Min Key Length", (x) => minTimeBetweenKeyFrames = x * (defaultMinTimeBetweenKeyFrames * 10 * 2), defaultMinTimeBetweenKeyFrames / 20, LoadImage("speed"));
                 }, LoadImage("settings"));
 
 
@@ -307,19 +320,61 @@ namespace CameraAnimation
             camera.sensorSize = sensorSize;
 
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
-            photoCameraClone.GetComponent<VRC.SDKBase.VRC_Pickup>().pickupable = allowKeyCameraPickup;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
             photoCameraClone.transform.position = position;
             photoCameraClone.transform.rotation = rotation;
-            positions.Add(new StoreTransform(photoCameraClone) { 
-                KeyPosition = keyPosition,
-                KeyRotation = keyRotation,
-                KeyZoom = keyZoom
-            });
+
+            var newTransform = CreateStoreTransform(photoCameraClone);
+
+            newTransform.KeyPosition = keyPosition;
+            newTransform.KeyRotation = keyRotation;
+            newTransform.KeyZoom = keyZoom;
+
+            positions.Add(newTransform);
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
+        }
+
+        /// <summary>
+        /// Creates a new StoreTransform using the provided GameObject
+        /// </summary>
+        StoreTransform CreateStoreTransform(GameObject gameObject)
+        {
+            var newTransform = new StoreTransform(gameObject, SetPickupable);
+
+            newTransform.Pickupable = allowKeyCameraPickup;
+
+            return newTransform;
+        }
+
+        /// <summary>
+        /// Sets the pickupable status of the provided gameobject
+        /// </summary>
+        void SetPickupable(bool value, GameObject obj)
+        {
+            if (obj)
+            {
+                var pickup = obj.GetComponent<VRC.SDKBase.VRC_Pickup>();
+
+                if (pickup)
+                {
+                    pickup.pickupable = value;
+                }
+            }
+            
+        }
+
+        /// <summary>
+        /// updates all StoreTransforms within positions to use the current allowKeyCameraPickup value;
+        /// </summary>
+        void UpdatePickupable()
+        {
+            foreach (var transform in positions)
+            {
+                transform.Pickupable = allowKeyCameraPickup;
+            }
         }
 
         public void UpdateLineRenderer()
@@ -423,7 +478,9 @@ namespace CameraAnimation
             float time = 0;
 
             if (loopMode)
-                positions.Add(new StoreTransform(positions[0].Photocamera));
+            {
+                positions.Add(CreateStoreTransform(positions[0].Photocamera));
+            }
 
             for (int i = 0; i < positions.Count; i++)
             {
@@ -497,11 +554,11 @@ namespace CameraAnimation
                 {
                     var nextTransform = positions[i + 1];
                     float distance = Vector3.Distance(transform.Position, nextTransform.Position);
-                    time += distance * Mathf.Lerp(0.2f, 5f, 1 - speed);
+                    time += distance * Mathf.Lerp(minTimeBetweenKeyFrames, maxTimeBetweenKeyFrames, 1 - speed);
                 }
                 else
                 {
-                    time += Mathf.Lerp(0.5f, 5f, 1 - speed);
+                    time += Mathf.Lerp(0.5f, maxTimeBetweenKeyFrames, 1 - speed);
                 }
             }
 

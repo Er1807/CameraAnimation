@@ -8,4 +8,10 @@
   <PropertyGroup>
     <ReferencePath>C:\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\;C:\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\;C:\Program Files (x86)\Steam\steamapps\common\VRChat\Mods\</ReferencePath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <StartAction>Program</StartAction>
+    <StartProgram>C:\Program Files %28x86%29\Steam\steamapps\common\VRChat\VRChat.exe</StartProgram>
+    <EnableUnmanagedDebugging>true</EnableUnmanagedDebugging>
+    <StartArguments>--no-vr</StartArguments>
+  </PropertyGroup>
 </Project>

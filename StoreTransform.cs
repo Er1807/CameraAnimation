@@ -21,12 +21,26 @@ namespace CameraAnimation
         public bool KeyRotation { get; set; } = true;
         public bool KeyZoom { get; set; } = true;
 
-        private readonly Camera _cachedCamera;
+        public bool Pickupable { 
+            get {
+                return _pickupable;
+            } 
+            set {
+                setCameraPickupable(value, Photocamera);
+                _pickupable = value;
+            } 
+        }
 
-        public StoreTransform(GameObject camera)
+        private bool _pickupable;
+
+        private readonly Camera _cachedCamera;
+        private readonly Action<bool, GameObject> setCameraPickupable;
+
+        public StoreTransform(GameObject camera, Action<bool, GameObject> setCameraPickupable)
         {
             Photocamera = camera;
             _cachedCamera = Photocamera.GetComponent<Camera>();
+            this.setCameraPickupable = setCameraPickupable;
         }
     }
 }
