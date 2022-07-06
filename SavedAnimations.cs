@@ -16,6 +16,10 @@ namespace CameraAnimation
 {
     public class SavedAnimations
     {
+        public const float DefaultFieldOfView = 50.0f;
+        private const string floatRegex = "([0-9-.]+);";
+        private const string vector2Regex = floatRegex + floatRegex;
+        private const string vector3Regex = vector2Regex + floatRegex;
         private CameraAnimationMod cameraAnimationMod;
         private MethodInfo UseKeyboardOnlyForText;
         public SavedAnimations(CameraAnimationMod cameraAnimationMod)
@@ -75,7 +79,7 @@ namespace CameraAnimation
             StringBuilder builder = new StringBuilder();
             foreach (var position in positions)
             {
-                builder.AppendLine(GenerateStringFromVector(position.Position) + GenerateStringFromVector(position.EulerAngles));
+                builder.AppendLine(GenerateStringFromVector(position.Position) + GenerateStringFromVector(position.EulerAngles) + position.FocalLength + ";");
             }
             return builder.ToString();
         }
@@ -84,10 +88,12 @@ namespace CameraAnimation
             return $"{vector.x.ToString(CultureInfo.InvariantCulture)};{vector.y.ToString(CultureInfo.InvariantCulture)};{vector.z.ToString(CultureInfo.InvariantCulture)};";
         }
 
+
         private void LoadPositionsFromString(string text)
         {
             cameraAnimationMod.ClearAnimation();
-            Regex lineRegex = new Regex("([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);");
+            
+            Regex lineRegex = new Regex(vector3Regex + vector3Regex + floatRegex + vector2Regex + vector2Regex);
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -98,18 +104,60 @@ namespace CameraAnimation
                     cameraAnimationMod.LoggerInstance.Error($"Error while loading line {line}");
                     return;
                 }
-                Vector3 positions = new Vector3(float.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture));
+                Vector3 positions = ParseVector3(match, 1);
 
-                Quaternion rotation  = Quaternion.Euler(float.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[5].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[6].Value, CultureInfo.InvariantCulture));
+                Quaternion rotation  = Quaternion.Euler(ParseVector3(match, 4));
 
-                cameraAnimationMod.AddPosition(positions, rotation);
+                float focalLength = DefaultFieldOfView;
+
+                if (float.TryParse(match.Groups[7].Value, out float parsed))
+                {
+                    focalLength = parsed;
+                }
+
+                Vector2 lensShift = ParseVector2(match, 7);
+
+                Vector2 sensorSize = ParseVector2(match, 9);
+
+                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize);
             }
         }
 
+        Vector3 ParseVector3(Match match, int offset)
+        {
+            Vector3 result = new Vector3();
+
+            if(float.TryParse(match.Groups[offset].Value, out float x))
+            {
+                result.x = x;
+            }
+            if (float.TryParse(match.Groups[offset+1].Value, out float y))
+            {
+                result.y = y;
+            }
+            if (float.TryParse(match.Groups[offset+2].Value, out float z))
+            {
+                result.z = z;
+            }
+
+            return result;
+        }
+
+        Vector2 ParseVector2(Match match, int offset)
+        {
+            Vector2 result = new Vector2();
+
+            if (float.TryParse(match.Groups[offset].Value, out float x))
+            {
+                result.x = x;
+            }
+            if (float.TryParse(match.Groups[offset+1].Value, out float y))
+            {
+                result.y = y;
+            }
+
+            return result;
+        }
 
         internal static string Clipboard
         {

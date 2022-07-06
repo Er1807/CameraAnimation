@@ -91,6 +91,8 @@ namespace CameraAnimation
 
         public readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
+        private float lineRendererWidth = 0.025f;
+        private bool allowKeyCameraPickup = true;
         private bool loopMode = false;
         private bool syncCameraIcon = true;
         private bool constantSpeed = false;
@@ -139,7 +141,7 @@ namespace CameraAnimation
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
                 lineRenderer.positionCount = 0;
-                lineRenderer.SetWidth(0.05f, 0.05f);
+                lineRenderer.SetWidth(lineRendererWidth, lineRendererWidth);
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
 
@@ -162,6 +164,7 @@ namespace CameraAnimation
                     }, LoadImage("sync camera icon"));
 
                     CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Enable\nKey Pickup", allowKeyCameraPickup, (x) => { allowKeyCameraPickup = x; }, LoadImage("constant speed"));
                     CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
                     {
                         showPath = x;
@@ -214,7 +217,7 @@ namespace CameraAnimation
             if (lineRenderer == null)
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
-                lineRenderer.SetWidth(0.05f, 0.05f);
+                lineRenderer.SetWidth(lineRendererWidth, lineRendererWidth);
                 lineRenderer.positionCount = 0;
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
@@ -269,19 +272,30 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            AddPosition(originalCamera.transform.position, originalCamera.transform.rotation);
+            var camera = originalCamera.GetComponent<Camera>();
+            AddPosition(originalCamera.transform.position, 
+                originalCamera.transform.rotation, 
+                camera.focalLength,
+                camera.lensShift,
+                camera.sensorSize);
         }
 
-        public void AddPosition(Vector3 position, Quaternion rotation)
+        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize)
         {
             var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
 
             var photoCameraClone = GameObject.Instantiate(originalCamera, lineRenderer.transform);
             photoCameraClone.GetComponentInChildren<MeshRenderer>().gameObject.layer = LayerMask.NameToLayer("UI");
-            photoCameraClone.GetComponent<Camera>().enabled = false;
+            
+            var camera = photoCameraClone.GetComponent<Camera>();
+            camera.enabled = false;
+            camera.focalLength = focalLength;
+            camera.lensShift = lensShift;
+            camera.sensorSize = sensorSize;
+
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
-            photoCameraClone.GetComponent<VRC.SDKBase.VRC_Pickup>().pickupable = true;
+            photoCameraClone.GetComponent<VRC.SDKBase.VRC_Pickup>().pickupable = allowKeyCameraPickup;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
             photoCameraClone.transform.position = position;
@@ -296,14 +310,15 @@ namespace CameraAnimation
         {
             if (positions.Count == 0) { lineRenderer.positionCount = 0; return; }
 
-            var (curveX, curveY, curveZ, _, _, _) = CreateCurves();
-            float lasttime = curveX.keys[curveX.length - 1].time;
+            ICameraCurve curve = CreateCurves();
+            float lasttime = curve.Transform.Position.X.Last.time;
             int countPoints = positions.Count * 10;
             float fraction = lasttime / countPoints;
             lineRenderer.positionCount = countPoints + 1;
             for (int i = 0; i <= countPoints; i++)
             {
-                lineRenderer.SetPosition(i, new Vector3(curveX.Evaluate(fraction * i), curveY.Evaluate(fraction * i), curveZ.Evaluate(fraction * i)));
+                float time = fraction * i;
+                lineRenderer.SetPosition(i, curve.Transform.Position.Evaluate(time) );
             }
 
         }
@@ -311,9 +326,6 @@ namespace CameraAnimation
         public override void OnLateUpdate()
         {
             if (anim == null || originalCamera == null) return;
-
-
-
 
             if (anim.isPlaying)
             {
@@ -334,40 +346,64 @@ namespace CameraAnimation
 
         }
 
+        public ICameraCurve CreateCameraCurve()
+        {
+            IVector3Curve Vector3Wrap(string prefix)
+            {
+                return new Vector3Curve()
+                {
+                    X = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".x"),
+                    Y = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".y"),
+                    Z = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".z")
+                };
+            }
+
+            IVector2Curve Vector2Wrap(string prefix)
+            {
+                return new Vector2Curve() {
+                    X = new CurveWrapper<Camera>(new AnimationCurve(), prefix + ".x"),
+                    Y = new CurveWrapper<Camera>(new AnimationCurve(), prefix + ".y"),
+                };
+            }
+
+            const string positionPrefix = nameof(Transform.localPosition);
+            const string rotationPrefix = nameof(Transform.localEulerAngles);
+
+            const string focalLengthKey = "m_FocalLength";
+            const string lensShiftKey = "m_LensShift";
+            const string sensorSizeKey = "m_SensorSize";
+
+            return new CameraCurve()
+            {
+                Transform = new TransformCurve()
+                {
+                    Position = Vector3Wrap(positionPrefix),
+                    Rotation = Vector3Wrap(rotationPrefix)
+                },
+                FocalLength = new CurveWrapper<Camera>(new AnimationCurve(), focalLengthKey),
+                LensShift = Vector2Wrap(lensShiftKey),
+                SensorSize = Vector2Wrap(sensorSizeKey),
+            };
+        }
+
         public AnimationClip CreateClip()
         {
-
-            AnimationCurve curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ;
-
-            (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ) = CreateCurves();
-
-
+            ICameraCurve curve = CreateCurves();
+            
             AnimationClip clip = new AnimationClip();
             clip.legacy = true;
 
-            var type = UnhollowerRuntimeLib.Il2CppType.Of<Transform>();
-            clip.SetCurve("", type, "localPosition.x", curveX);
-            clip.SetCurve("", type, "localPosition.y", curveY);
-            clip.SetCurve("", type, "localPosition.z", curveZ);
-
-            clip.SetCurve("", type, "localEulerAngles.x", curveRotX);
-            clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
-            clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
+            curve.Set(clip);
 
             clip.EnsureQuaternionContinuity();
+
             return clip;
-
-
         }
 
-        private (AnimationCurve curveX, AnimationCurve curveY, AnimationCurve curveZ, AnimationCurve curveRotX, AnimationCurve curveRotY, AnimationCurve curveRotZ) CreateCurves()
+        private ICameraCurve CreateCurves()
         {
-            AnimationCurve curveX = new AnimationCurve();
-            AnimationCurve curveY = new AnimationCurve();
-            AnimationCurve curveZ = new AnimationCurve();
-            AnimationCurve curveRotX = new AnimationCurve();
-            AnimationCurve curveRotY = new AnimationCurve();
-            AnimationCurve curveRotZ = new AnimationCurve();
+            ICameraCurve curve = CreateCameraCurve();
+
             float time = 0;
 
             if (loopMode)
@@ -375,31 +411,32 @@ namespace CameraAnimation
 
             for (int i = 0; i < positions.Count; i++)
             {
-                curveX.AddKey(time, positions[i].Position.x);
-                curveY.AddKey(time, positions[i].Position.y);
-                curveZ.AddKey(time, positions[i].Position.z);
+                var transform = positions[i];
+                var position = transform.Position;
+                var rotation = transform.EulerAngles;
 
-                float rotX = positions[i].EulerAngles.x;
-                float rotY = positions[i].EulerAngles.y;
-                float rotZ = positions[i].EulerAngles.z;
+                curve.FocalLength.Add(time, transform.FocalLength);
+                curve.LensShift.Add(time, transform.LensShift);
+                curve.SensorSize.Add(time, transform.SensorSize);
+
+                curve.Transform.Position.Add(time, position.x, position.y, position.z);
+
+                float rotX = rotation.x;
+                float rotY = rotation.y;
+                float rotZ = rotation.z;
+
                 if (i == 0)
                 {
-                    positions[i].EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
                 }
                 else if (i != 0)
                 {
-                    //correct rotations to be negative if needed and writeback for next itteration
-                    float lastRotX = positions[i - 1].EulerAngles.x;
-                    float lastRotY = positions[i - 1].EulerAngles.y;
-                    float lastRotZ = positions[i - 1].EulerAngles.z;
+                    var previousTransform = positions[i - 1];
+                    var previousRotation = previousTransform.EulerAngles;
 
-                    float lastRotXAdj = positions[i - 1].EulerAnglesCorrected.x;
-                    float lastRotYAdj = positions[i - 1].EulerAnglesCorrected.y;
-                    float lastRotZAdj = positions[i - 1].EulerAnglesCorrected.z;
-
-                    float diffX = rotX - lastRotX;
-                    float diffY = rotY - lastRotY;
-                    float diffZ = rotZ - lastRotZ;
+                    float diffX = rotX - previousRotation.x;
+                    float diffY = rotY - previousRotation.y;
+                    float diffZ = rotZ - previousRotation.z;
 
                     if (diffX > 180)
                         diffX -= 360;
@@ -415,23 +452,25 @@ namespace CameraAnimation
                     if (diffZ < -180)
                         diffZ = 360 + diffZ;
 
+                    //correct rotations to be negative if needed and writeback for next itteration
+                    float lastRotXAdj = previousTransform.EulerAnglesCorrected.x;
+                    float lastRotYAdj = previousTransform.EulerAnglesCorrected.y;
+                    float lastRotZAdj = previousTransform.EulerAnglesCorrected.z;
+
                     rotX = lastRotXAdj + diffX;
                     rotY = lastRotYAdj + diffY;
                     rotZ = lastRotZAdj + diffZ;
 
 
-                    positions[i].EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
                 } // 342 -> 60   360+60 = 420
-                rotX = positions[i].EulerAnglesCorrected.x;
-                rotY = positions[i].EulerAnglesCorrected.y;
-                rotZ = positions[i].EulerAnglesCorrected.z;
 
-                curveRotX.AddKey(time, rotX);
-                curveRotY.AddKey(time, rotY);
-                curveRotZ.AddKey(time, rotZ);
+                curve.Transform.Rotation.Add(time, transform.EulerAnglesCorrected);
+
                 if (i < positions.Count - 1 && constantSpeed)
                 {
-                    float distance = Vector3.Distance(positions[i].Position, positions[i + 1].Position);
+                    var nextTransform = positions[i + 1];
+                    float distance = Vector3.Distance(transform.Position, nextTransform.Position);
                     time += distance * Mathf.Lerp(0.2f, 5f, 1 - speed);
                 }
                 else
@@ -439,10 +478,11 @@ namespace CameraAnimation
                     time += Mathf.Lerp(0.5f, 5f, 1 - speed);
                 }
             }
+
             if (loopMode)
                 positions.RemoveAt(positions.Count - 1);
 
-            return (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ);
+            return curve;
         }
 
         public void PlayAnimation()
@@ -451,13 +491,24 @@ namespace CameraAnimation
                 videoCameraWasActive = originalVideoCamera.active;
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
+            
             anim = originalCamera.GetComponent<Animation>();
             if (anim == null)
                 anim = originalCamera.AddComponent<Animation>();
 
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
+
+            // set the focal length to match the first frame
+            // before we play the animation
+            var camera = originalCamera.GetComponent<Camera>();
+
+            camera.focalLength = positions[0].FocalLength;
+            camera.sensorSize = positions[0].SensorSize;
+            camera.lensShift = positions[0].LensShift;
+
             anim.Play(clip.name);
+
             if(MelonHandler.Mods.Any(x => x.Info.Name == "FreezeFrame"))
             {
                 var cloneHolder = SceneManager.GetActiveScene().GetRootGameObjects().FirstOrDefault(x => x.name == "Avatar Clone Holder");
@@ -472,11 +523,7 @@ namespace CameraAnimation
         }
         private void StopAnimation()
         {
-            if (anim != null)
-            {
-                anim.Stop();
-            }
+            anim?.Stop();
         }
-
     }
 }
