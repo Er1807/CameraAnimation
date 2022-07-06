@@ -92,7 +92,6 @@ namespace CameraAnimation
         public readonly List<StoreTransform> positions = new List<StoreTransform>();
         private float speed = 0.5f;
         private float lineRendererWidth = 0.025f;
-        private bool allowKeyCameraPickup = true;
         private bool loopMode = false;
         private bool syncCameraIcon = true;
         private bool constantSpeed = false;
@@ -102,7 +101,11 @@ namespace CameraAnimation
         private Animation anim = null;
         private bool shouldBePlaying = false;
 
+        private bool allowKeyCameraPickup = false;
 
+        private bool keyPosition = true;
+        private bool keyRotation = true;
+        private bool keyZoom = true;
 
         private SavedAnimations savedAnimations = null;
 
@@ -172,6 +175,15 @@ namespace CameraAnimation
                     }, LoadImage("show path"));
 
                 }, LoadImage("settings"));
+
+            CustomSubMenu.AddSubMenu("Keying",
+                delegate
+                {
+                    CustomSubMenu.AddToggle("Position", keyPosition, (x) => { keyPosition = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Rotation", keyRotation, (x) => { keyRotation = x;  }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Zoom", keyZoom, (x) => { keyZoom = x;  }, LoadImage("save pos"));
+                }, LoadImage("settings"));
+
 
             CustomSubMenu.AddSubMenu("Saved",
                 delegate
@@ -300,7 +312,11 @@ namespace CameraAnimation
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
             photoCameraClone.transform.position = position;
             photoCameraClone.transform.rotation = rotation;
-            positions.Add(new StoreTransform(photoCameraClone));
+            positions.Add(new StoreTransform(photoCameraClone) { 
+                KeyPosition = keyPosition,
+                KeyRotation = keyRotation,
+                KeyZoom = keyZoom
+            });
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
@@ -415,57 +431,67 @@ namespace CameraAnimation
                 var position = transform.Position;
                 var rotation = transform.EulerAngles;
 
-                curve.FocalLength.Add(time, transform.FocalLength);
-                curve.LensShift.Add(time, transform.LensShift);
-                curve.SensorSize.Add(time, transform.SensorSize);
-
-                curve.Transform.Position.Add(time, position.x, position.y, position.z);
-
-                float rotX = rotation.x;
-                float rotY = rotation.y;
-                float rotZ = rotation.z;
-
-                if (i == 0)
+                if (transform.KeyZoom)
                 {
-                    transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    curve.FocalLength.Add(time, transform.FocalLength);
+                    curve.LensShift.Add(time, transform.LensShift);
+                    curve.SensorSize.Add(time, transform.SensorSize);
                 }
-                else if (i != 0)
+
+                if (transform.KeyPosition)
                 {
-                    var previousTransform = positions[i - 1];
-                    var previousRotation = previousTransform.EulerAngles;
+                    curve.Transform.Position.Add(time, position.x, position.y, position.z);
+                }
 
-                    float diffX = rotX - previousRotation.x;
-                    float diffY = rotY - previousRotation.y;
-                    float diffZ = rotZ - previousRotation.z;
+                if (transform.KeyRotation)
+                {
+                    float rotX = rotation.x;
+                    float rotY = rotation.y;
+                    float rotZ = rotation.z;
 
-                    if (diffX > 180)
-                        diffX -= 360;
-                    if (diffY > 180)
-                        diffY -= 360;
-                    if (diffZ > 180)
-                        diffZ -= 360;
+                    if (i == 0)
+                    {
+                        transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    }
+                    else if (i != 0)
+                    {
+                        var previousTransform = positions[i - 1];
+                        var previousRotation = previousTransform.EulerAngles;
 
-                    if (diffX < -180)
-                        diffX = 360 + diffX;
-                    if (diffY < -180)
-                        diffY = 360 + diffY;
-                    if (diffZ < -180)
-                        diffZ = 360 + diffZ;
+                        float diffX = rotX - previousRotation.x;
+                        float diffY = rotY - previousRotation.y;
+                        float diffZ = rotZ - previousRotation.z;
 
-                    //correct rotations to be negative if needed and writeback for next itteration
-                    float lastRotXAdj = previousTransform.EulerAnglesCorrected.x;
-                    float lastRotYAdj = previousTransform.EulerAnglesCorrected.y;
-                    float lastRotZAdj = previousTransform.EulerAnglesCorrected.z;
+                        if (diffX > 180)
+                            diffX -= 360;
+                        if (diffY > 180)
+                            diffY -= 360;
+                        if (diffZ > 180)
+                            diffZ -= 360;
 
-                    rotX = lastRotXAdj + diffX;
-                    rotY = lastRotYAdj + diffY;
-                    rotZ = lastRotZAdj + diffZ;
+                        if (diffX < -180)
+                            diffX = 360 + diffX;
+                        if (diffY < -180)
+                            diffY = 360 + diffY;
+                        if (diffZ < -180)
+                            diffZ = 360 + diffZ;
+
+                        //correct rotations to be negative if needed and writeback for next itteration
+                        float lastRotXAdj = previousTransform.EulerAnglesCorrected.x;
+                        float lastRotYAdj = previousTransform.EulerAnglesCorrected.y;
+                        float lastRotZAdj = previousTransform.EulerAnglesCorrected.z;
+
+                        rotX = lastRotXAdj + diffX;
+                        rotY = lastRotYAdj + diffY;
+                        rotZ = lastRotZAdj + diffZ;
 
 
-                    transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
-                } // 342 -> 60   360+60 = 420
+                        transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    } // 342 -> 60   360+60 = 420
 
-                curve.Transform.Rotation.Add(time, transform.EulerAnglesCorrected);
+                    curve.Transform.Rotation.Add(time, transform.EulerAnglesCorrected);
+
+                }
 
                 if (i < positions.Count - 1 && constantSpeed)
                 {

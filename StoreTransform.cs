@@ -17,6 +17,9 @@ namespace CameraAnimation
 
         public Vector2 SensorSize => _cachedCamera.sensorSize;
 
+        public bool KeyPosition { get; set; } = true;
+        public bool KeyRotation { get; set; } = true;
+        public bool KeyZoom { get; set; } = true;
 
         private readonly Camera _cachedCamera;
 
