@@ -10,7 +10,7 @@ namespace CameraAnimation
     public class TransformCurve : ITransformCurve
     {
         public IVector3Curve Position { get; set; }
-        public IVector3Curve Rotation { get; set; }
+        public IVector4Curve Rotation { get; set; }
 
         public int Length => Math.Max( Position.Length, Rotation.Length );
 

@@ -10,6 +10,14 @@ namespace CameraAnimation
 {
     public static class SerializationExtensions
     {
+        public static void Serialize(this Vector4 vector, StringBuilder builder)
+        {
+            vector.x.Serialize(builder);
+            vector.y.Serialize(builder);
+            vector.z.Serialize(builder);
+            vector.w.Serialize(builder, ';');
+        }
+
         public static void Serialize(this Vector3 vector, StringBuilder builder)
         {
             vector.x.Serialize(builder);

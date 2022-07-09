@@ -11,8 +11,8 @@ namespace CameraAnimation
 
         public Vector3 Position => Photocamera.transform.position;
 
-        public Vector3 EulerAngles => Photocamera.transform.eulerAngles;
-        public Vector3 EulerAnglesCorrected;
+        public Vector4 Rotation => new Vector4(Photocamera.transform.localRotation.x, Photocamera.transform.localRotation.y, 
+                                                Photocamera.transform.localRotation.z, Photocamera.transform.localRotation.w);
 
         public float FocalLength => _cachedCamera.focalLength;
         public Vector2 LensShift => _cachedCamera.lensShift;
@@ -48,7 +48,7 @@ namespace CameraAnimation
         public void Serialize(StringBuilder builder)
         {
             Position.Serialize(builder);
-            EulerAngles.Serialize(builder);
+            Rotation.Serialize(builder);
             FocalLength.Serialize(builder, ';');
             LensShift.Serialize(builder);
             SensorSize.Serialize(builder);

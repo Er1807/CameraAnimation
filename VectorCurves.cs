@@ -7,6 +7,34 @@ using UnityEngine;
 
 namespace CameraAnimation
 {
+    public class Vector4Curve : Vector3Curve, IVector4Curve
+    {
+        public ICurve W { get; set; }
+
+        public new int Length => Math.Max(X.Length, Math.Max(Math.Max(Y.Length, Z.Length), W.Length));
+
+        public (int, int, int, int) Add(float time, float x, float y, float z, float w)
+        {
+            return (X.Add(time, x), Y.Add(time, y), Z.Add(time, z), W.Add(time, w));
+        }
+
+        public (int, int, int, int) Add(float time, Vector4 value)
+        {
+            return Add(time, value.x, value.y, value.z, value.w);
+        }
+
+        public new Vector4 Evaluate(float time)
+        {
+            return new Vector4(X.Evaluate(time), Y.Evaluate(time), Z.Evaluate(time), W.Evaluate(time));
+        }
+
+        public new void Set(AnimationClip clip)
+        {
+            base.Set(clip);
+            W.Set(clip);
+        }
+    }
+
     public class Vector3Curve : Vector2Curve, IVector3Curve
     {
         public ICurve Z { get; set; }

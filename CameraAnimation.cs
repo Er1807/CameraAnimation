@@ -422,6 +422,17 @@ namespace CameraAnimation
 
         public ICameraCurve CreateCameraCurve()
         {
+            IVector4Curve Vector4Wrap(string prefix)
+            {
+                return new Vector4Curve()
+                {
+                    X = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".x"),
+                    Y = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".y"),
+                    Z = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".z"),
+                    W = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".w")
+                };
+            }
+
             IVector3Curve Vector3Wrap(string prefix)
             {
                 return new Vector3Curve()
@@ -441,7 +452,7 @@ namespace CameraAnimation
             }
 
             const string positionPrefix = nameof(Transform.localPosition);
-            const string rotationPrefix = nameof(Transform.localEulerAngles);
+            const string rotationPrefix = nameof(Transform.localRotation);
 
             const string focalLengthKey = "m_FocalLength";
             const string lensShiftKey = "m_LensShift";
@@ -452,7 +463,7 @@ namespace CameraAnimation
                 Transform = new TransformCurve()
                 {
                     Position = Vector3Wrap(positionPrefix),
-                    Rotation = Vector3Wrap(rotationPrefix)
+                    Rotation = Vector4Wrap(rotationPrefix)
                 },
                 FocalLength = new CurveWrapper<Camera>(new AnimationCurve(), focalLengthKey),
                 LensShift = Vector2Wrap(lensShiftKey),
@@ -488,8 +499,6 @@ namespace CameraAnimation
             for (int i = 0; i < positions.Count; i++)
             {
                 var transform = positions[i];
-                var position = transform.Position;
-                var rotation = transform.EulerAngles;
 
                 if (transform.KeyZoom)
                 {
@@ -500,56 +509,12 @@ namespace CameraAnimation
 
                 if (transform.KeyPosition)
                 {
-                    curve.Transform.Position.Add(time, position.x, position.y, position.z);
+                    curve.Transform.Position.Add(time, transform.Position);
                 }
 
                 if (transform.KeyRotation)
                 {
-                    float rotX = rotation.x;
-                    float rotY = rotation.y;
-                    float rotZ = rotation.z;
-
-                    if (i == 0)
-                    {
-                        transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
-                    }
-                    else if (i != 0)
-                    {
-                        var previousTransform = positions[i - 1];
-                        var previousRotation = previousTransform.EulerAngles;
-
-                        float diffX = rotX - previousRotation.x;
-                        float diffY = rotY - previousRotation.y;
-                        float diffZ = rotZ - previousRotation.z;
-
-                        if (diffX > 180)
-                            diffX -= 360;
-                        if (diffY > 180)
-                            diffY -= 360;
-                        if (diffZ > 180)
-                            diffZ -= 360;
-
-                        if (diffX < -180)
-                            diffX = 360 + diffX;
-                        if (diffY < -180)
-                            diffY = 360 + diffY;
-                        if (diffZ < -180)
-                            diffZ = 360 + diffZ;
-
-                        //correct rotations to be negative if needed and writeback for next itteration
-                        float lastRotXAdj = previousTransform.EulerAnglesCorrected.x;
-                        float lastRotYAdj = previousTransform.EulerAnglesCorrected.y;
-                        float lastRotZAdj = previousTransform.EulerAnglesCorrected.z;
-
-                        rotX = lastRotXAdj + diffX;
-                        rotY = lastRotYAdj + diffY;
-                        rotZ = lastRotZAdj + diffZ;
-
-
-                        transform.EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
-                    } // 342 -> 60   360+60 = 420
-
-                    curve.Transform.Rotation.Add(time, transform.EulerAnglesCorrected);
+                    curve.Transform.Rotation.Add(time, transform.Rotation);
 
                 }
 

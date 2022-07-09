@@ -21,6 +21,7 @@ namespace CameraAnimation
         private const string boolRegex = "\\D{4,5};";
         private const string vector2Regex = floatRegex + floatRegex;
         private const string vector3Regex = vector2Regex + floatRegex;
+        private const string vector4Regex = vector3Regex + floatRegex;
         private CameraAnimationMod cameraAnimationMod;
         private MethodInfo UseKeyboardOnlyForText;
         public SavedAnimations(CameraAnimationMod cameraAnimationMod)
@@ -90,7 +91,7 @@ namespace CameraAnimation
         {
             cameraAnimationMod.ClearAnimation();
             
-            Regex lineRegex = new Regex(vector3Regex + vector3Regex + floatRegex + vector2Regex + vector2Regex + boolRegex + boolRegex + boolRegex);
+            Regex lineRegex = new Regex(vector3Regex + vector4Regex + floatRegex + vector2Regex + vector2Regex + boolRegex + boolRegex + boolRegex);
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -102,23 +103,23 @@ namespace CameraAnimation
                     return;
                 }
                 Vector3 positions = ParseVector3(match, 1);
-
-                Quaternion rotation  = Quaternion.Euler(ParseVector3(match, 4));
+                Vector4 vectorRot = ParseVector4(match, 4);
+                Quaternion rotation  = new Quaternion(vectorRot.x, vectorRot.y, vectorRot.z, vectorRot.w);
 
                 float focalLength = DefaultFieldOfView;
 
-                if (float.TryParse(match.Groups[7].Value, out float parsed))
+                if (float.TryParse(match.Groups[8].Value, out float parsed))
                 {
                     focalLength = parsed;
                 }
 
-                Vector2 lensShift = ParseVector2(match, 7);
+                Vector2 lensShift = ParseVector2(match, 8);
 
-                Vector2 sensorSize = ParseVector2(match, 9);
+                Vector2 sensorSize = ParseVector2(match, 10);
 
-                bool keyPosition = ParseBool(match, 10);
-                bool keyRotation = ParseBool(match, 11);
-                bool keyZoom = ParseBool(match, 12);
+                bool keyPosition = ParseBool(match, 11);
+                bool keyRotation = ParseBool(match, 12);
+                bool keyZoom = ParseBool(match, 13);
 
                 cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize, keyPosition, keyRotation, keyZoom);
             }
@@ -131,6 +132,30 @@ namespace CameraAnimation
                 return x;
             }
             return false;
+        }
+
+        Vector4 ParseVector4(Match match, int offset)
+        {
+            Vector4 result = new Vector4();
+
+            if (float.TryParse(match.Groups[offset].Value, out float x))
+            {
+                result.x = x;
+            }
+            if (float.TryParse(match.Groups[offset + 1].Value, out float y))
+            {
+                result.y = y;
+            }
+            if (float.TryParse(match.Groups[offset + 2].Value, out float z))
+            {
+                result.z = z;
+            }
+            if (float.TryParse(match.Groups[offset + 3].Value, out float w))
+            {
+                result.w = w;
+            }
+
+            return result;
         }
 
         Vector3 ParseVector3(Match match, int offset)
