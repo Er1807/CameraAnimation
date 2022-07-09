@@ -576,6 +576,8 @@ namespace CameraAnimation
             if (!shouldBePlaying)
                 videoCameraWasActive = originalVideoCamera.active;
 
+            if (positions.Count == 0) return;
+
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
             
             anim = originalCamera.GetComponent<Animation>();
