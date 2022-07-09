@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Globalization;
+using System.Text;
 using UnityEngine;
 
 namespace CameraAnimation
@@ -41,6 +43,18 @@ namespace CameraAnimation
             Photocamera = camera;
             _cachedCamera = Photocamera.GetComponent<Camera>();
             this.setCameraPickupable = setCameraPickupable;
+        }
+
+        public void Serialize(StringBuilder builder)
+        {
+            Position.Serialize(builder);
+            EulerAngles.Serialize(builder);
+            FocalLength.Serialize(builder, ';');
+            LensShift.Serialize(builder);
+            SensorSize.Serialize(builder);
+            KeyPosition.Serialize(builder);
+            KeyRotation.Serialize(builder);
+            KeyZoom.Serialize(builder);
         }
     }
 }

@@ -18,6 +18,7 @@ namespace CameraAnimation
     {
         public const float DefaultFieldOfView = 50.0f;
         private const string floatRegex = "([0-9-.]+);";
+        private const string boolRegex = "\\D{4,5};";
         private const string vector2Regex = floatRegex + floatRegex;
         private const string vector3Regex = vector2Regex + floatRegex;
         private CameraAnimationMod cameraAnimationMod;
@@ -79,21 +80,17 @@ namespace CameraAnimation
             StringBuilder builder = new StringBuilder();
             foreach (var position in positions)
             {
-                builder.AppendLine(GenerateStringFromVector(position.Position) + GenerateStringFromVector(position.EulerAngles) + position.FocalLength + ";");
+                position.Serialize(builder);
+                builder.Append(Environment.NewLine);
             }
             return builder.ToString();
         }
-        private string GenerateStringFromVector(Vector3 vector)
-        {
-            return $"{vector.x.ToString(CultureInfo.InvariantCulture)};{vector.y.ToString(CultureInfo.InvariantCulture)};{vector.z.ToString(CultureInfo.InvariantCulture)};";
-        }
-
 
         private void LoadPositionsFromString(string text)
         {
             cameraAnimationMod.ClearAnimation();
             
-            Regex lineRegex = new Regex(vector3Regex + vector3Regex + floatRegex + vector2Regex + vector2Regex);
+            Regex lineRegex = new Regex(vector3Regex + vector3Regex + floatRegex + vector2Regex + vector2Regex + boolRegex + boolRegex + boolRegex);
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -119,8 +116,21 @@ namespace CameraAnimation
 
                 Vector2 sensorSize = ParseVector2(match, 9);
 
-                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize);
+                bool keyPosition = ParseBool(match, 10);
+                bool keyRotation = ParseBool(match, 11);
+                bool keyZoom = ParseBool(match, 12);
+
+                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize, keyPosition, keyRotation, keyZoom);
             }
+        }
+
+        bool ParseBool(Match match, int offset)
+        {
+            if (bool.TryParse(match.Groups[offset].Value, out bool x))
+            {
+                return x;
+            }
+            return false;
         }
 
         Vector3 ParseVector3(Match match, int offset)

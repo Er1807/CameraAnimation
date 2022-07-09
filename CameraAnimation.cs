@@ -302,10 +302,13 @@ namespace CameraAnimation
                 originalCamera.transform.rotation, 
                 camera.focalLength,
                 camera.lensShift,
-                camera.sensorSize);
+                camera.sensorSize, 
+                keyPosition, 
+                keyRotation, 
+                keyZoom);
         }
 
-        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize)
+        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize, bool keyPosition, bool keyRotation, bool keyZoom)
         {
             var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
