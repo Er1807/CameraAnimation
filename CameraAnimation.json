@@ -1,7 +1,7 @@
 {
   "_id": 256,
   "name": "Camera Animations",
-  "modversion": "2.2.0",
+  "modversion": "2.3.0",
   "vrchatversion": "1201",
   "loaderversion": "v0.5.4",
   "modtype": "Mod",
@@ -14,8 +14,8 @@
     "[ActionMenuApi](https://github.com/gompocp/ActionMenuApi)",
     "[UIExpansionKit](https://github.com/knah/VRCMods#ui--kit)"
   ],
-  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v2.2.0/CameraAnimation.dll",
+  "downloadlink": "https://github.com/Er1807/CameraAnimation/releases/download/v2.3.0/CameraAnimation.dll",
   "sourcelink": "https://github.com/Er1807/CameraAnimation",
-  "changelog": "Rebuild for 1201",
+  "changelog": "Fix pink line at 0,0",
   "embedcolor": "7F60CA"
 }
