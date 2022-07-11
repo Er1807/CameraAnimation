@@ -14,8 +14,8 @@ namespace CameraAnimation
             public static float DefaultAperture { get; set; } = 15.0f;
             public static float DefaultFocalDistance { get; set; } = 1.5f;
             public static float DefaultFocalLength { get; set; }
-            public static Vector2 DefaultSensorSize { get;set; }
-            public static Vector2 DefaultLensShift { get; set; }
+            public static Vector2 DefaultSensorSize { get; set; } = new Vector2(70, 51);
+            public static Vector2 DefaultLensShift { get; set; } = new Vector2(0, 0);
         }
 
         public static class Keying
