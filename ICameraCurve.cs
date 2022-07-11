@@ -4,9 +4,7 @@
     {
         ITransformCurve Transform { get; set; }
         ICurve Zoom { get; set; }
-        ICurve Apature { get; set; }
-        ICurve ApatureAlternate { get; set; } //there are 2 values for it that need to be animated
+        ICurve Aperture { get; set; }
         ICurve FocalDistance { get; set; }
-        ICurve FocalDistanceAlternate { get; set; }//there are 2 values for it that need to be animated
     }
 }

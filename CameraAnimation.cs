@@ -25,7 +25,7 @@ using CameraSliderEnum = EnumPublicSealedvaNoDoZoDo6vDoUnique;
 using CameraFocusMode = EnumPublicSealedvaOfFuSeMa5vUnique;
 using Il2CppSystem.Reflection;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.1", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
@@ -444,11 +444,6 @@ namespace CameraAnimation
                 };
             }
 
-            ICurve CameraSettingsCurve(string key)
-            {
-                return new CurveWrapper<CameraSettings>(new AnimationCurve(), key);
-            }
-
             const string positionPrefix = nameof(Transform.localPosition);
             const string rotationPrefix = nameof(Transform.localRotation);
 
@@ -459,6 +454,12 @@ namespace CameraAnimation
             string focalDistanceKey = FocalDistanceProps[0]?.Name ?? string.Empty;
             string alternateFocalDistanceKey = FocalDistanceProps[1]?.Name ?? string.Empty;
 
+            List<(string path, string key)> pathKeysZoom = new List<(string, string)>() { ("", zoomKey), ("VideoCamera", zoomKey) };
+            List<(string path, string key)> pathKeysAperture = new List<(string, string)>() { ("", apertureKey), ("VideoCamera", apertureKey), 
+                                                                                              ("", alternateApertureKey), ("VideoCamera", alternateApertureKey) };
+            List<(string path, string key)> pathKeysFocalDistance = new List<(string, string)>() { ("", focalDistanceKey), ("VideoCamera", focalDistanceKey),
+                                                                                                   ("", alternateFocalDistanceKey), ("VideoCamera", alternateFocalDistanceKey)};
+
             return new CameraCurve()
             {
                 Transform = new TransformCurve()
@@ -466,11 +467,9 @@ namespace CameraAnimation
                     Position = Vector3Wrap(positionPrefix),
                     Rotation = Vector4Wrap(rotationPrefix)
                 },
-                Apature = CameraSettingsCurve(apertureKey),
-                ApatureAlternate = CameraSettingsCurve(alternateApertureKey),
-                FocalDistance = CameraSettingsCurve(focalDistanceKey),
-                FocalDistanceAlternate = CameraSettingsCurve(alternateFocalDistanceKey),
-                Zoom = new CurveWrapper<CameraSettings>(new AnimationCurve(), zoomKey),
+                Aperture = new CurveWrapper<CameraSettings>(new AnimationCurve(), pathKeysAperture),
+                FocalDistance = new CurveWrapper<CameraSettings>(new AnimationCurve(), pathKeysFocalDistance),
+                Zoom = new CurveWrapper<CameraSettings>(new AnimationCurve(), pathKeysZoom),
             };
         }
 
@@ -510,10 +509,8 @@ namespace CameraAnimation
 
                 if (transform.KeyFocus)
                 {
-                    curve.Apature.Add(time, transform.Aperture);
-                    curve.ApatureAlternate.Add(time, transform.Aperture);
+                    curve.Aperture.Add(time, transform.Aperture);
                     curve.FocalDistance.Add(time, transform.FocalDistance);
-                    curve.FocalDistanceAlternate.Add(time, transform.FocalDistance);
                 }
 
                 if (transform.KeyPosition)
