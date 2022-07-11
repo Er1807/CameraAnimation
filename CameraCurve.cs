@@ -14,6 +14,10 @@ namespace CameraAnimation
         public IVector2Curve LensShift { get; set; }
         public IVector2Curve SensorSize { get; set; }
         public ITransformCurve Transform { get; set; }
+        public ICurve Apature { get; set; }
+        public ICurve ApatureCopy { get; set; } //there are 2 values for it that need to be animated
+        public ICurve FocalDistance { get; set; }
+        public ICurve FocalDistanceCopy { get; set; }
 
         public int Length => Math.Max(FocalLength.Length, Transform.Length);
 
@@ -23,6 +27,8 @@ namespace CameraAnimation
             FocalLength.Set(clip);
             LensShift.Set(clip);
             SensorSize.Set(clip);
+            Apature.Set(clip);
+            FocalDistance.Set(clip);
         }
     }
 }

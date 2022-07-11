@@ -19,6 +19,11 @@ using VRC.SDKBase;
 using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
+using CameraSettings = MonoBehaviourPublicAcInCaInTeShInMaBoInUnique;
+using CameraSlider = MonoBehaviourPublicAc2ObSicaObdotySlObUnique;
+using CameraSliderEnum = EnumPublicSealedvaNoDoZoDo6vDoUnique;
+using CameraFocusMode = EnumPublicSealedvaOfFuSeMa5vUnique;
+using System.Reflection;
 
 [assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
@@ -54,37 +59,60 @@ namespace CameraAnimation
             return iconsAssetBundle.LoadAsset_Internal($"Assets/icons-camera/{name}.png", Il2CppType.Of<Texture2D>()).Cast<Texture2D>();
         }
 
+        private GameObject _originalCamera;
+
         private GameObject originalCamera
         {
             get
             {
+                if (_originalCamera != null) return _originalCamera;
                 UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
                 if (controller == null) return null;
                 foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
                 {
                     var obj = prop.GetValue(controller) as GameObject;
                     if (obj != null && obj.name == "PhotoCamera")
-                        return obj;
+                    {
+                        _originalCamera = obj;
+                        break;
+                    }
                 }
 
-                return null;
+                return _originalCamera;
             }
         }
 
+        private GameObject _originalVideoCamera;
         private GameObject originalVideoCamera
         {
             get
             {
+                if (_originalVideoCamera != null) return _originalVideoCamera;
                 UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
                 if (controller == null) return null;
                 foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
                 {
                     var obj = prop.GetValue(controller) as GameObject;
                     if (obj != null && obj.name == "VideoCamera")
-                        return obj;
+                    {
+                        _originalVideoCamera = obj;
+                        break;
+                    }
                 }
 
-                return null;
+                return _originalVideoCamera;
+            }
+        }
+
+        private CameraSettings _cameraSettings;
+        private CameraSettings cameraSettings
+        {
+            get
+            {
+                if (_cameraSettings != null) return _cameraSettings;
+                if (originalCamera == null) return null;
+                _cameraSettings = originalCamera.GetComponent<CameraSettings>();
+                return _cameraSettings;
             }
         }
 
@@ -113,6 +141,8 @@ namespace CameraAnimation
         private bool keyRotation = true;
         // whether or not the FOLLOWING keyframes contain zoom keys
         private bool keyZoom = true;
+        // whether or not the FOLLOWING keyframes contain focus keys
+        private bool keyFocus = true;
         private float defaultMaxTimeBetweenKeyFrames = 5f;
         private float maxTimeBetweenKeyFrames = 5f;
         private float defaultMinTimeBetweenKeyFrames = 0.2f;
@@ -131,6 +161,7 @@ namespace CameraAnimation
             {
                 MelonCoroutines.Start(WaitForCamera());
             }
+            MelonCoroutines.Start(RetrieveCamerasettingsParameter());
 
             savedAnimations = new SavedAnimations(this);
             var icon = LoadImage("play");
@@ -192,7 +223,8 @@ namespace CameraAnimation
                 {
                     CustomSubMenu.AddToggle("Position", keyPosition, (x) => { keyPosition = x; }, LoadImage("save pos"));
                     CustomSubMenu.AddToggle("Rotation", keyRotation, (x) => { keyRotation = x;  }, LoadImage("save pos"));
-                    CustomSubMenu.AddToggle("Zoom", keyZoom, (x) => { keyZoom = x;  }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Zoom", keyZoom, (x) => { keyZoom = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Focus", keyFocus, (x) => { keyFocus = x; }, LoadImage("save pos"));
                     CustomSubMenu.AddRadialPuppet("Max Key Length", (x) => maxTimeBetweenKeyFrames = x * (defaultMaxTimeBetweenKeyFrames * 10 * 2), defaultMaxTimeBetweenKeyFrames / 20, LoadImage("speed"));
                     CustomSubMenu.AddRadialPuppet("Min Key Length", (x) => minTimeBetweenKeyFrames = x * (defaultMinTimeBetweenKeyFrames * 10 * 2), defaultMinTimeBetweenKeyFrames / 20, LoadImage("speed"));
                 }, LoadImage("settings"));
@@ -305,10 +337,11 @@ namespace CameraAnimation
                 camera.sensorSize, 
                 keyPosition, 
                 keyRotation, 
-                keyZoom);
+                keyZoom,
+                keyFocus);
         }
 
-        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize, bool keyPosition, bool keyRotation, bool keyZoom)
+        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize, bool keyPosition, bool keyRotation, bool keyZoom, bool keyFocus)
         {
             var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
@@ -333,6 +366,7 @@ namespace CameraAnimation
             newTransform.KeyPosition = keyPosition;
             newTransform.KeyRotation = keyRotation;
             newTransform.KeyZoom = keyZoom;
+            newTransform.KeyFocus = keyFocus;
 
             positions.Add(newTransform);
 
@@ -404,6 +438,15 @@ namespace CameraAnimation
             if (anim.isPlaying)
             {
                 originalVideoCamera.active = true;
+                var time = anim.GetStateAtIndex(0).time;
+                foreach (var prop in AperatureProps)
+                {
+                    prop.SetValue(cameraSettings, currentCurve.Apature.Evaluate(time));
+                }
+                foreach (var prop in FocalDistanceProps)
+                {
+                    prop.SetValue(cameraSettings, currentCurve.FocalDistance.Evaluate(time));
+                }
             }
             else if (loopMode)
             {
@@ -468,17 +511,21 @@ namespace CameraAnimation
                 FocalLength = new CurveWrapper<Camera>(new AnimationCurve(), focalLengthKey),
                 LensShift = Vector2Wrap(lensShiftKey),
                 SensorSize = Vector2Wrap(sensorSizeKey),
+                Apature = new CurveWrapper<CameraSettings>(new AnimationCurve(), AperatureProps[0].Name),
+                ApatureCopy = new CurveWrapper<CameraSettings>(new AnimationCurve(), AperatureProps[1].Name),
+                FocalDistance = new CurveWrapper<CameraSettings>(new AnimationCurve(), FocalDistanceProps[0].Name),
+                FocalDistanceCopy = new CurveWrapper<CameraSettings>(new AnimationCurve(), FocalDistanceProps[1].Name),
             };
         }
 
         public AnimationClip CreateClip()
         {
-            ICameraCurve curve = CreateCurves();
+            currentCurve = CreateCurves();
             
             AnimationClip clip = new AnimationClip();
             clip.legacy = true;
-
-            curve.Set(clip);
+            clip.name = "CameraAnimation";
+            currentCurve.Set(clip);
 
             clip.EnsureQuaternionContinuity();
 
@@ -505,6 +552,14 @@ namespace CameraAnimation
                     curve.FocalLength.Add(time, transform.FocalLength);
                     curve.LensShift.Add(time, transform.LensShift);
                     curve.SensorSize.Add(time, transform.SensorSize);
+                }
+
+                if (transform.KeyFocus)
+                {
+                    curve.Apature.Add(time, transform.Aperture);
+                    curve.ApatureCopy.Add(time, transform.Aperture);
+                    curve.FocalDistance.Add(time, transform.FocalDistance);
+                    curve.FocalDistanceCopy.Add(time, transform.FocalDistance);
                 }
 
                 if (transform.KeyPosition)
@@ -577,6 +632,55 @@ namespace CameraAnimation
         private void StopAnimation()
         {
             anim?.Stop();
+        }
+
+        public static List<PropertyInfo> FocalDistanceProps = new List<PropertyInfo>();
+        public static List<PropertyInfo> AperatureProps = new List<PropertyInfo>();
+        private ICameraCurve currentCurve;
+
+        public IEnumerator RetrieveCamerasettingsParameter() {
+            while (originalCamera == null) yield return null;
+            while (!originalCamera.gameObject.active) yield return null;
+
+            LoggerInstance.Msg("Applying detection values");
+
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 5.124f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 6.124f);
+            cameraSettings.enabled = true;
+            cameraSettings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.Manual;
+
+            yield return new WaitForSeconds(1);
+
+            LoggerInstance.Msg("checking values");
+            foreach (var field in typeof(CameraSettings).GetProperties().Where(x => x.Name.StartsWith("field_Public_Single_")))
+            {
+                //LoggerInstance.Msg("checking field " + field.Name +"With value " + field.GetValue(settings));
+                if (((float)field.GetValue(cameraSettings)) == 5.124f)
+                {
+                    FocalDistanceProps.Add(field);
+                    LoggerInstance.Msg("Found DofFocalDistance under " + field.Name);
+                }
+
+                if (((float)field.GetValue(cameraSettings)) == 6.124f)
+                {
+                    AperatureProps.Add(field);
+                    LoggerInstance.Msg("Found DofAperature under " + field.Name);
+                }
+            }
+
+            LoggerInstance.Msg("Restoring values");
+
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 1.5f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 15f);
+            cameraSettings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.FullAuto;
+            cameraSettings.enabled = false;
+
+            if (FocalDistanceProps.Count != 2)
+                LoggerInstance.Error("Didnt find 2 DofFocalDistance attributes, found " + FocalDistanceProps.Count);
+            if (AperatureProps.Count != 2)
+                LoggerInstance.Error("Didnt find 2 DofAperature attributes, found " + AperatureProps.Count);
+
+
         }
     }
 }

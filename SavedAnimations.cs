@@ -17,6 +17,8 @@ namespace CameraAnimation
     public class SavedAnimations
     {
         public const float DefaultFieldOfView = 50.0f;
+        public const float DefaultApeture = 15.0f;
+        public const float DefaultFocalDistance = 1.5f;
         private const string floatRegex = "([0-9-.]+);";
         private const string boolRegex = "\\D{4,5};";
         private const string vector2Regex = floatRegex + floatRegex;
@@ -108,20 +110,35 @@ namespace CameraAnimation
 
                 float focalLength = DefaultFieldOfView;
 
-                if (float.TryParse(match.Groups[8].Value, out float parsed))
+                if (float.TryParse(match.Groups[8].Value, out float parsedFocalLength))
                 {
-                    focalLength = parsed;
+                    focalLength = parsedFocalLength;
                 }
 
                 Vector2 lensShift = ParseVector2(match, 8);
 
                 Vector2 sensorSize = ParseVector2(match, 10);
 
-                bool keyPosition = ParseBool(match, 11);
-                bool keyRotation = ParseBool(match, 12);
-                bool keyZoom = ParseBool(match, 13);
 
-                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize, keyPosition, keyRotation, keyZoom);
+                float apeture = DefaultApeture;
+                float focalDistance = DefaultFocalDistance;
+
+                if (float.TryParse(match.Groups[11].Value, out float parsedApeture))
+                {
+                    apeture = parsedApeture;
+                }
+
+                if (float.TryParse(match.Groups[12].Value, out float parsedFocalDistance))
+                {
+                    focalDistance = parsedFocalDistance;
+                }
+
+                bool keyPosition = ParseBool(match, 13);
+                bool keyRotation = ParseBool(match, 14);
+                bool keyZoom = ParseBool(match, 15);
+                bool keyFocus = ParseBool(match, 16);
+
+                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize, keyPosition, keyRotation, keyZoom, keyFocus);
             }
         }
 

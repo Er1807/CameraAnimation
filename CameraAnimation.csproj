@@ -115,10 +115,10 @@
     <Compile Include="ICameraCurve.cs" />
     <Compile Include="ICurve.cs" />
     <Compile Include="ITransformCurve.cs" />
-    <Compile Include="IVector3Curve.cs" />
+    <Compile Include="IVectorCurves.cs" />
     <Compile Include="SerializationExtensions.cs" />
     <Compile Include="TransformCurve.cs" />
-    <Compile Include="Vector3Curve.cs" />
+    <Compile Include="VectorCurves.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SavedAnimations.cs" />
     <Compile Include="StoreTransform.cs" />
