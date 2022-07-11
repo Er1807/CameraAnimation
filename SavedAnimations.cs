@@ -17,7 +17,7 @@ namespace CameraAnimation
     public class SavedAnimations
     {
         private const string floatRegex = "([0-9-.]+);";
-        private const string boolRegex = "\\D{4,5};";
+        private const string boolRegex = "(\\D{4,5});";
         private const string vector2Regex = floatRegex + floatRegex;
         private const string vector3Regex = vector2Regex + floatRegex;
         private const string vector4Regex = vector3Regex + floatRegex;
@@ -90,7 +90,7 @@ namespace CameraAnimation
         {
             cameraAnimationMod.ClearAnimation();
             
-            Regex lineRegex = new Regex(vector3Regex + vector4Regex + floatRegex + vector2Regex + vector2Regex + boolRegex + boolRegex + boolRegex);
+            Regex lineRegex = new Regex(vector3Regex + vector4Regex + floatRegex + floatRegex + floatRegex + boolRegex + boolRegex + boolRegex + boolRegex);
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -102,40 +102,18 @@ namespace CameraAnimation
                     return;
                 }
                 Vector3 positions = ParseVector3(match, 1);
-                Vector4 vectorRot = ParseVector4(match, 4);
-                Quaternion rotation  = new Quaternion(vectorRot.x, vectorRot.y, vectorRot.z, vectorRot.w);
+                Quaternion rotation = ParseVector4(match, 4).ToQuaternion();
 
-                float focalLength = Settings.Camera.DefaultFieldOfView;
+                float zoom = ParseFloat(match, 8, Settings.Camera.DefaultZoom);
+                float aperature = ParseFloat(match, 9, Settings.Camera.DefaultAperture);
+                float focalDistance = ParseFloat(match, 10, Settings.Camera.DefaultFocalDistance);
 
-                if (float.TryParse(match.Groups[8].Value, out float parsedFocalLength))
-                {
-                    focalLength = parsedFocalLength;
-                }
-
-                Vector2 lensShift = ParseVector2(match, 8);
-
-                Vector2 sensorSize = ParseVector2(match, 10);
-
-
-                float aperature = Settings.Camera.DefaultAperture;
-                float focalDistance = Settings.Camera.DefaultFocalDistance;
-
-                if (float.TryParse(match.Groups[11].Value, out float parsedApeture))
-                {
-                    aperature = parsedApeture;
-                }
-
-                if (float.TryParse(match.Groups[12].Value, out float parsedFocalDistance))
-                {
-                    focalDistance = parsedFocalDistance;
-                }
-
-                bool keyPosition = ParseBool(match, 13);
-                bool keyRotation = ParseBool(match, 14);
-                bool keyZoom = ParseBool(match, 15);
-                bool keyFocus = ParseBool(match, 16);
-
-                var newTransform = new StoreTransform(aperature, focalDistance, focalLength, lensShift, sensorSize, positions, rotation) { 
+                bool keyPosition = ParseBool(match, 11);
+                bool keyRotation = ParseBool(match, 12);
+                bool keyZoom = ParseBool(match, 13);
+                bool keyFocus = ParseBool(match, 14);
+                CameraAnimationMod.Instance.LoggerInstance.Msg((keyPosition, keyRotation, keyZoom, keyFocus));
+                var newTransform = new StoreTransform(aperature, focalDistance, zoom, positions, rotation) { 
                     KeyPosition = keyPosition,
                     KeyRotation = keyRotation,
                     KeyZoom = keyZoom,
@@ -148,6 +126,8 @@ namespace CameraAnimation
 
         bool ParseBool(Match match, int offset)
         {
+            CameraAnimationMod.Instance.LoggerInstance.Msg("Bool: " + match.Groups[offset].Value);
+
             if (bool.TryParse(match.Groups[offset].Value, out bool x))
             {
                 return x;
@@ -155,27 +135,25 @@ namespace CameraAnimation
             return false;
         }
 
+        float ParseFloat(Match match, int offset, float defaultValue = 0)
+        {
+            CameraAnimationMod.Instance.LoggerInstance.Msg("Float: " + match.Groups[offset].Value);
+            if (float.TryParse(match.Groups[offset].Value, out float parsed))
+            {
+                return parsed;
+            }
+            return defaultValue;
+        }
+
         Vector4 ParseVector4(Match match, int offset)
         {
             Vector4 result = new Vector4();
 
-            if (float.TryParse(match.Groups[offset].Value, out float x))
-            {
-                result.x = x;
-            }
-            if (float.TryParse(match.Groups[offset + 1].Value, out float y))
-            {
-                result.y = y;
-            }
-            if (float.TryParse(match.Groups[offset + 2].Value, out float z))
-            {
-                result.z = z;
-            }
-            if (float.TryParse(match.Groups[offset + 3].Value, out float w))
-            {
-                result.w = w;
-            }
-
+            result.x = ParseFloat(match, offset);
+            result.y = ParseFloat(match, offset +1);
+            result.z = ParseFloat(match, offset +2);
+            result.w = ParseFloat(match, offset +3);
+            
             return result;
         }
 
@@ -183,18 +161,9 @@ namespace CameraAnimation
         {
             Vector3 result = new Vector3();
 
-            if(float.TryParse(match.Groups[offset].Value, out float x))
-            {
-                result.x = x;
-            }
-            if (float.TryParse(match.Groups[offset+1].Value, out float y))
-            {
-                result.y = y;
-            }
-            if (float.TryParse(match.Groups[offset+2].Value, out float z))
-            {
-                result.z = z;
-            }
+            result.x = ParseFloat(match, offset);
+            result.y = ParseFloat(match, offset + 1);
+            result.z = ParseFloat(match, offset + 2);
 
             return result;
         }

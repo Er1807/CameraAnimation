@@ -23,7 +23,7 @@ using CameraSettings = MonoBehaviourPublicAcInCaInTeShInMaBoInUnique;
 using CameraSlider = MonoBehaviourPublicAc2ObSicaObdotySlObUnique;
 using CameraSliderEnum = EnumPublicSealedvaNoDoZoDo6vDoUnique;
 using CameraFocusMode = EnumPublicSealedvaOfFuSeMa5vUnique;
-using System.Reflection;
+using Il2CppSystem.Reflection;
 
 [assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.0", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
@@ -127,9 +127,12 @@ namespace CameraAnimation
         
         private SavedAnimations savedAnimations = null;
 
+        public static CameraAnimationMod Instance;
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         public override void OnApplicationStart()
         {
+            Instance = this;
             if (MelonHandler.Mods.Any(x => x.Info.Name == "TouchCamera"))
             {
                 AddTochCameraHook();
@@ -310,10 +313,7 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            var newTransform = new StoreTransform()
-            {
-                Photocamera = originalCamera
-            };
+            var newTransform = new StoreTransform(originalCamera);
 
             AddPosition(newTransform);
         }
@@ -328,9 +328,7 @@ namespace CameraAnimation
             
             var camera = photoCameraClone.GetComponent<Camera>();
             camera.enabled = false;
-            camera.focalLength = position.FocalLength;
-            camera.lensShift = position.LensShift;
-            camera.sensorSize = position.SensorSize;
+
 
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
@@ -341,6 +339,7 @@ namespace CameraAnimation
             position.Photocamera = photoCameraClone;
 
             positions.Add(position);
+
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
@@ -398,15 +397,6 @@ namespace CameraAnimation
             if (anim.isPlaying)
             {
                 originalVideoCamera.active = true;
-                var time = anim.GetStateAtIndex(0).time;
-                foreach (var prop in ApertureProps)
-                {
-                    prop.SetValue(cameraSettings, currentCurve.Apature.Evaluate(time));
-                }
-                foreach (var prop in FocalDistanceProps)
-                {
-                    prop.SetValue(cameraSettings, currentCurve.FocalDistance.Evaluate(time));
-                }
             }
             else if (loopMode)
             {
@@ -462,10 +452,8 @@ namespace CameraAnimation
             const string positionPrefix = nameof(Transform.localPosition);
             const string rotationPrefix = nameof(Transform.localRotation);
 
-            const string focalLengthKey = "m_FocalLength";
-            const string lensShiftKey = "m_LensShift";
-            const string sensorSizeKey = "m_SensorSize";
 
+            string zoomKey = ZoomProps[0]?.Name ?? string.Empty;
             string apertureKey = ApertureProps[0]?.Name ?? string.Empty;
             string alternateApertureKey = ApertureProps[1]?.Name ?? string.Empty;
             string focalDistanceKey = FocalDistanceProps[0]?.Name ?? string.Empty;
@@ -478,13 +466,11 @@ namespace CameraAnimation
                     Position = Vector3Wrap(positionPrefix),
                     Rotation = Vector4Wrap(rotationPrefix)
                 },
-                FocalLength = new CurveWrapper<Camera>(new AnimationCurve(), focalLengthKey),
-                LensShift = Vector2Wrap(lensShiftKey),
-                SensorSize = Vector2Wrap(sensorSizeKey),
                 Apature = CameraSettingsCurve(apertureKey),
                 ApatureAlternate = CameraSettingsCurve(alternateApertureKey),
                 FocalDistance = CameraSettingsCurve(focalDistanceKey),
-                FocalDistanceAlternate = CameraSettingsCurve(alternateFocalDistanceKey)
+                FocalDistanceAlternate = CameraSettingsCurve(alternateFocalDistanceKey),
+                Zoom = new CurveWrapper<CameraSettings>(new AnimationCurve(), zoomKey),
             };
         }
 
@@ -510,7 +496,7 @@ namespace CameraAnimation
 
             if (loopMode)
             {
-                positions.Add(new StoreTransform() { Photocamera = positions[0].Photocamera });
+                positions.Add(new StoreTransform(positions[0].Photocamera));
             }
 
             for (int i = 0; i < positions.Count; i++)
@@ -519,9 +505,7 @@ namespace CameraAnimation
 
                 if (transform.KeyZoom)
                 {
-                    curve.FocalLength.Add(time, transform.FocalLength);
-                    curve.LensShift.Add(time, transform.LensShift);
-                    curve.SensorSize.Add(time, transform.SensorSize);
+                    curve.Zoom.Add(time, transform.Zoom);
                 }
 
                 if (transform.KeyFocus)
@@ -551,7 +535,7 @@ namespace CameraAnimation
                 }
                 else
                 {
-                    time += Mathf.Lerp(0.5f, Settings.Keying.MinTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
+                    time += Mathf.Lerp(Settings.Keying.MinTimeBetweenKeyFrames, Settings.Keying.MaxTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
                 }
             }
 
@@ -577,14 +561,6 @@ namespace CameraAnimation
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
 
-            // set the focal length to match the first frame
-            // before we play the animation
-            var camera = originalCamera.GetComponent<Camera>();
-
-            camera.focalLength = positions[0].FocalLength;
-            camera.sensorSize = positions[0].SensorSize;
-            camera.lensShift = positions[0].LensShift;
-
             anim.Play(clip.name);
 
             if(MelonHandler.Mods.Any(x => x.Info.Name == "FreezeFrame"))
@@ -604,8 +580,11 @@ namespace CameraAnimation
             anim?.Stop();
         }
 
-        public static List<PropertyInfo> FocalDistanceProps = new List<PropertyInfo>();
-        public static List<PropertyInfo> ApertureProps = new List<PropertyInfo>();
+
+        public static List<FieldInfo> FocalDistanceProps = new List<FieldInfo>();
+        public static List<FieldInfo> ApertureProps = new List<FieldInfo>();
+        public static List<FieldInfo> ZoomProps = new List<FieldInfo>();
+
         private ICameraCurve currentCurve;
 
         public IEnumerator RetrieveCamerasettingsParameter() {
@@ -616,25 +595,33 @@ namespace CameraAnimation
 
             CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 5.124f);
             CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 6.124f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.Zoom, 47.154f);
             cameraSettings.enabled = true;
             cameraSettings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.Manual;
 
             yield return new WaitForSeconds(1);
 
             LoggerInstance.Msg("checking values");
-            foreach (var field in typeof(CameraSettings).GetProperties().Where(x => x.Name.StartsWith("field_Public_Single_")))
+
+            foreach (var field in Il2CppType.Of<CameraSettings>().GetFields().Where(x => x.FieldType.Name == "Single"))
             {
-                //LoggerInstance.Msg("checking field " + field.Name +"With value " + field.GetValue(settings));
-                if (((float)field.GetValue(cameraSettings)) == 5.124f)
+                //LoggerInstance.Msg("checking field " + field.Name +"With value " + field.GetValue(cameraSettings).Unbox<float>());
+                if (field.GetValue(cameraSettings).Unbox<float>() == 5.124f)
                 {
                     FocalDistanceProps.Add(field);
                     LoggerInstance.Msg("Found DofFocalDistance under " + field.Name);
                 }
 
-                if (((float)field.GetValue(cameraSettings)) == 6.124f)
+                if (field.GetValue(cameraSettings).Unbox<float>() == 6.124f)
                 {
                     ApertureProps.Add(field);
                     LoggerInstance.Msg("Found DofAperature under " + field.Name);
+                }
+
+                if (field.GetValue(cameraSettings).Unbox<float>() == 47.154f)
+                {
+                    ZoomProps.Add(field);
+                    LoggerInstance.Msg("Found Zoom under " + field.Name);
                 }
             }
 
@@ -642,6 +629,7 @@ namespace CameraAnimation
 
             CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 1.5f);
             CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 15f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.Zoom, 45f);
             cameraSettings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.FullAuto;
             cameraSettings.enabled = false;
 
@@ -649,6 +637,9 @@ namespace CameraAnimation
                 LoggerInstance.Error("Didnt find 2 DofFocalDistance attributes, found " + FocalDistanceProps.Count);
             if (ApertureProps.Count != 2)
                 LoggerInstance.Error("Didnt find 2 DofAperature attributes, found " + ApertureProps.Count);
+            if (ZoomProps.Count != 1)
+                LoggerInstance.Error("Didnt find 1 Zoom attributes, found " + ApertureProps.Count);
+
 
 
         }

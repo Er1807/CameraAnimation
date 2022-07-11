@@ -10,10 +10,9 @@ namespace CameraAnimation
     public static class Settings
     {
         public static class Camera {
-            public static float DefaultFieldOfView { get; set; } = 50.0f;
+            public static float DefaultZoom { get; set; } = 50.0f;
             public static float DefaultAperture { get; set; } = 15.0f;
             public static float DefaultFocalDistance { get; set; } = 1.5f;
-            public static float DefaultFocalLength { get; set; }
             public static Vector2 DefaultSensorSize { get; set; } = new Vector2(70, 51);
             public static Vector2 DefaultLensShift { get; set; } = new Vector2(0, 0);
         }
