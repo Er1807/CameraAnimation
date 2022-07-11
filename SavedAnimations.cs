@@ -16,9 +16,6 @@ namespace CameraAnimation
 {
     public class SavedAnimations
     {
-        public const float DefaultFieldOfView = 50.0f;
-        public const float DefaultApeture = 15.0f;
-        public const float DefaultFocalDistance = 1.5f;
         private const string floatRegex = "([0-9-.]+);";
         private const string boolRegex = "\\D{4,5};";
         private const string vector2Regex = floatRegex + floatRegex;
@@ -108,7 +105,7 @@ namespace CameraAnimation
                 Vector4 vectorRot = ParseVector4(match, 4);
                 Quaternion rotation  = new Quaternion(vectorRot.x, vectorRot.y, vectorRot.z, vectorRot.w);
 
-                float focalLength = DefaultFieldOfView;
+                float focalLength = Settings.Camera.DefaultFieldOfView;
 
                 if (float.TryParse(match.Groups[8].Value, out float parsedFocalLength))
                 {
@@ -120,12 +117,12 @@ namespace CameraAnimation
                 Vector2 sensorSize = ParseVector2(match, 10);
 
 
-                float apeture = DefaultApeture;
-                float focalDistance = DefaultFocalDistance;
+                float aperature = Settings.Camera.DefaultAperture;
+                float focalDistance = Settings.Camera.DefaultFocalDistance;
 
                 if (float.TryParse(match.Groups[11].Value, out float parsedApeture))
                 {
-                    apeture = parsedApeture;
+                    aperature = parsedApeture;
                 }
 
                 if (float.TryParse(match.Groups[12].Value, out float parsedFocalDistance))
@@ -138,7 +135,14 @@ namespace CameraAnimation
                 bool keyZoom = ParseBool(match, 15);
                 bool keyFocus = ParseBool(match, 16);
 
-                cameraAnimationMod.AddPosition(positions, rotation, focalLength, lensShift, sensorSize, keyPosition, keyRotation, keyZoom, keyFocus);
+                var newTransform = new StoreTransform(aperature, focalDistance, focalLength, lensShift, sensorSize, positions, rotation) { 
+                    KeyPosition = keyPosition,
+                    KeyRotation = keyRotation,
+                    KeyZoom = keyZoom,
+                    KeyFocus = keyFocus
+                };
+
+                cameraAnimationMod.AddPosition(newTransform);
             }
         }
 

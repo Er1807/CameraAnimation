@@ -117,37 +117,14 @@ namespace CameraAnimation
         }
 
         public readonly List<StoreTransform> positions = new List<StoreTransform>();
-        private float speed = 0.5f;
-        private float lineRendererWidth = 0.025f;
         private bool loopMode = false;
         private bool syncCameraIcon = true;
         private bool constantSpeed = false;
-        private bool showPath = true;
         private bool videoCameraWasActive = false;
         private LineRenderer lineRenderer;
         private Animation anim = null;
         private bool shouldBePlaying = false;
-
-        // whether or not the NEXT and FOLLOWING camera objects should be "pickupable"
-        // changes to this value ONLY affect the following spawned cameras
-        // to update all cameras with the new value, call UpdatePickupable()
-        private bool allowKeyCameraPickup = false;
         
-
-        // KEYING
-        // whether or not the FOLLOWING keyframes contain position keys
-        private bool keyPosition = true;
-        // whether or not the FOLLOWING keyframes contain rotation keys
-        private bool keyRotation = true;
-        // whether or not the FOLLOWING keyframes contain zoom keys
-        private bool keyZoom = true;
-        // whether or not the FOLLOWING keyframes contain focus keys
-        private bool keyFocus = true;
-        private float defaultMaxTimeBetweenKeyFrames = 5f;
-        private float maxTimeBetweenKeyFrames = 5f;
-        private float defaultMinTimeBetweenKeyFrames = 0.2f;
-        private float minTimeBetweenKeyFrames = 0.2f;
-
         private SavedAnimations savedAnimations = null;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -176,6 +153,10 @@ namespace CameraAnimation
                 VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main, "Camera Animation", CreateActionMenu, icon);
 
             LoggerInstance.Msg("Actionmenu initialised");
+
+            // allow all instances of StoreTransform to toggle the camera pickup
+            // without linking vrc in the StoreTransform file
+            StoreTransform.SetCameraPickupable = SetPickupable;
         }
 
         private void CreateActionMenu()
@@ -186,7 +167,7 @@ namespace CameraAnimation
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
                 lineRenderer.positionCount = 0;
-                lineRenderer.SetWidth(lineRendererWidth, lineRendererWidth);
+                lineRenderer.SetWidth(Settings.UI.PathWidth, Settings.UI.PathWidth);
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
 
@@ -199,7 +180,7 @@ namespace CameraAnimation
             CustomSubMenu.AddSubMenu("Settings",
                 delegate
                 {
-                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed, LoadImage("speed"));
+                    CustomSubMenu.AddRadialPuppet("Speed", (x) => Settings.Animation.Speed = x, Settings.Animation.Speed, LoadImage("speed"));
                     CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
                     CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) =>
                     {
@@ -209,11 +190,11 @@ namespace CameraAnimation
                     }, LoadImage("sync camera icon"));
 
                     CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
-                    CustomSubMenu.AddToggle("Enable\nKey Pickup", allowKeyCameraPickup, (x) => { allowKeyCameraPickup = x; UpdatePickupable(); }, LoadImage("constant speed"));
-                    CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
+                    CustomSubMenu.AddToggle("Enable\nKey Pickup", Settings.Interaction.AllowCameraPickup, (x) => { Settings.Interaction.AllowCameraPickup = x; UpdatePickupable(); }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Show\nPath", Settings.UI.ShowPath, (x) =>
                     {
-                        showPath = x;
-                        lineRenderer.enabled = showPath;
+                        Settings.UI.ShowPath = x;
+                        lineRenderer.enabled = Settings.UI.ShowPath;
                     }, LoadImage("show path"));
 
                 }, LoadImage("settings"));
@@ -221,12 +202,12 @@ namespace CameraAnimation
             CustomSubMenu.AddSubMenu("Keying",
                 delegate
                 {
-                    CustomSubMenu.AddToggle("Position", keyPosition, (x) => { keyPosition = x; }, LoadImage("save pos"));
-                    CustomSubMenu.AddToggle("Rotation", keyRotation, (x) => { keyRotation = x;  }, LoadImage("save pos"));
-                    CustomSubMenu.AddToggle("Zoom", keyZoom, (x) => { keyZoom = x; }, LoadImage("save pos"));
-                    CustomSubMenu.AddToggle("Focus", keyFocus, (x) => { keyFocus = x; }, LoadImage("save pos"));
-                    CustomSubMenu.AddRadialPuppet("Max Key Length", (x) => maxTimeBetweenKeyFrames = x * (defaultMaxTimeBetweenKeyFrames * 10 * 2), defaultMaxTimeBetweenKeyFrames / 20, LoadImage("speed"));
-                    CustomSubMenu.AddRadialPuppet("Min Key Length", (x) => minTimeBetweenKeyFrames = x * (defaultMinTimeBetweenKeyFrames * 10 * 2), defaultMinTimeBetweenKeyFrames / 20, LoadImage("speed"));
+                    CustomSubMenu.AddToggle("Position", Settings.Keying.KeyPosition, (x) => { Settings.Keying.KeyPosition = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Rotation", Settings.Keying.KeyRotation, (x) => { Settings.Keying.KeyRotation = x;  }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Zoom", Settings.Keying.KeyZoom, (x) => { Settings.Keying.KeyZoom = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Focus", Settings.Keying.KeyFocus, (x) => { Settings.Keying.KeyFocus = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddRadialPuppet("Max Key Length", (x) => Settings.Keying.MaxTimeBetweenKeyFrames = x * (Settings.Keying.DefaultMaxTimeBetweenKeyFrames * 10 * 2), Settings.Keying.MaxTimeBetweenKeyFrames / 20, LoadImage("speed"));
+                    CustomSubMenu.AddRadialPuppet("Min Key Length", (x) => Settings.Keying.MinTimeBetweenKeyFrames = x * (Settings.Keying.DefaultMinTimeBetweenKeyFrames * 10 * 2), Settings.Keying.MinTimeBetweenKeyFrames / 20, LoadImage("speed"));
                 }, LoadImage("settings"));
 
 
@@ -274,7 +255,7 @@ namespace CameraAnimation
             if (lineRenderer == null)
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
-                lineRenderer.SetWidth(lineRendererWidth, lineRendererWidth);
+                lineRenderer.SetWidth(Settings.UI.PathWidth, Settings.UI.PathWidth);
                 lineRenderer.positionCount = 0;
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
@@ -329,19 +310,15 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            var camera = originalCamera.GetComponent<Camera>();
-            AddPosition(originalCamera.transform.position, 
-                originalCamera.transform.rotation, 
-                camera.focalLength,
-                camera.lensShift,
-                camera.sensorSize, 
-                keyPosition, 
-                keyRotation, 
-                keyZoom,
-                keyFocus);
+            var newTransform = new StoreTransform()
+            {
+                Photocamera = originalCamera
+            };
+
+            AddPosition(newTransform);
         }
 
-        public void AddPosition(Vector3 position, Quaternion rotation, float focalLength, Vector2 lensShift, Vector2 sensorSize, bool keyPosition, bool keyRotation, bool keyZoom, bool keyFocus)
+        public void AddPosition(StoreTransform position)
         {
             var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
@@ -351,39 +328,22 @@ namespace CameraAnimation
             
             var camera = photoCameraClone.GetComponent<Camera>();
             camera.enabled = false;
-            camera.focalLength = focalLength;
-            camera.lensShift = lensShift;
-            camera.sensorSize = sensorSize;
+            camera.focalLength = position.FocalLength;
+            camera.lensShift = position.LensShift;
+            camera.sensorSize = position.SensorSize;
 
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
-            photoCameraClone.transform.position = position;
-            photoCameraClone.transform.rotation = rotation;
+            photoCameraClone.transform.position = position.Position;
+            photoCameraClone.transform.rotation = position.Rotation.ToQuaternion();
 
-            var newTransform = CreateStoreTransform(photoCameraClone);
+            position.Photocamera = photoCameraClone;
 
-            newTransform.KeyPosition = keyPosition;
-            newTransform.KeyRotation = keyRotation;
-            newTransform.KeyZoom = keyZoom;
-            newTransform.KeyFocus = keyFocus;
-
-            positions.Add(newTransform);
+            positions.Add(position);
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
-        }
-
-        /// <summary>
-        /// Creates a new StoreTransform using the provided GameObject
-        /// </summary>
-        StoreTransform CreateStoreTransform(GameObject gameObject)
-        {
-            var newTransform = new StoreTransform(gameObject, SetPickupable);
-
-            newTransform.Pickupable = allowKeyCameraPickup;
-
-            return newTransform;
         }
 
         /// <summary>
@@ -410,7 +370,7 @@ namespace CameraAnimation
         {
             foreach (var transform in positions)
             {
-                transform.Pickupable = allowKeyCameraPickup;
+                transform.Pickupable = Settings.Interaction.AllowCameraPickup;
             }
         }
 
@@ -439,7 +399,7 @@ namespace CameraAnimation
             {
                 originalVideoCamera.active = true;
                 var time = anim.GetStateAtIndex(0).time;
-                foreach (var prop in AperatureProps)
+                foreach (var prop in ApertureProps)
                 {
                     prop.SetValue(cameraSettings, currentCurve.Apature.Evaluate(time));
                 }
@@ -494,12 +454,22 @@ namespace CameraAnimation
                 };
             }
 
+            ICurve CameraSettingsCurve(string key)
+            {
+                return new CurveWrapper<CameraSettings>(new AnimationCurve(), key);
+            }
+
             const string positionPrefix = nameof(Transform.localPosition);
             const string rotationPrefix = nameof(Transform.localRotation);
 
             const string focalLengthKey = "m_FocalLength";
             const string lensShiftKey = "m_LensShift";
             const string sensorSizeKey = "m_SensorSize";
+
+            string apertureKey = ApertureProps[0]?.Name ?? string.Empty;
+            string alternateApertureKey = ApertureProps[1]?.Name ?? string.Empty;
+            string focalDistanceKey = FocalDistanceProps[0]?.Name ?? string.Empty;
+            string alternateFocalDistanceKey = FocalDistanceProps[1]?.Name ?? string.Empty;
 
             return new CameraCurve()
             {
@@ -511,10 +481,10 @@ namespace CameraAnimation
                 FocalLength = new CurveWrapper<Camera>(new AnimationCurve(), focalLengthKey),
                 LensShift = Vector2Wrap(lensShiftKey),
                 SensorSize = Vector2Wrap(sensorSizeKey),
-                Apature = new CurveWrapper<CameraSettings>(new AnimationCurve(), AperatureProps[0].Name),
-                ApatureCopy = new CurveWrapper<CameraSettings>(new AnimationCurve(), AperatureProps[1].Name),
-                FocalDistance = new CurveWrapper<CameraSettings>(new AnimationCurve(), FocalDistanceProps[0].Name),
-                FocalDistanceCopy = new CurveWrapper<CameraSettings>(new AnimationCurve(), FocalDistanceProps[1].Name),
+                Apature = CameraSettingsCurve(apertureKey),
+                ApatureAlternate = CameraSettingsCurve(alternateApertureKey),
+                FocalDistance = CameraSettingsCurve(focalDistanceKey),
+                FocalDistanceAlternate = CameraSettingsCurve(alternateFocalDistanceKey)
             };
         }
 
@@ -540,7 +510,7 @@ namespace CameraAnimation
 
             if (loopMode)
             {
-                positions.Add(CreateStoreTransform(positions[0].Photocamera));
+                positions.Add(new StoreTransform() { Photocamera = positions[0].Photocamera });
             }
 
             for (int i = 0; i < positions.Count; i++)
@@ -557,9 +527,9 @@ namespace CameraAnimation
                 if (transform.KeyFocus)
                 {
                     curve.Apature.Add(time, transform.Aperture);
-                    curve.ApatureCopy.Add(time, transform.Aperture);
+                    curve.ApatureAlternate.Add(time, transform.Aperture);
                     curve.FocalDistance.Add(time, transform.FocalDistance);
-                    curve.FocalDistanceCopy.Add(time, transform.FocalDistance);
+                    curve.FocalDistanceAlternate.Add(time, transform.FocalDistance);
                 }
 
                 if (transform.KeyPosition)
@@ -577,11 +547,11 @@ namespace CameraAnimation
                 {
                     var nextTransform = positions[i + 1];
                     float distance = Vector3.Distance(transform.Position, nextTransform.Position);
-                    time += distance * Mathf.Lerp(minTimeBetweenKeyFrames, maxTimeBetweenKeyFrames, 1 - speed);
+                    time += distance * Mathf.Lerp(Settings.Keying.MinTimeBetweenKeyFrames, Settings.Keying.MaxTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
                 }
                 else
                 {
-                    time += Mathf.Lerp(0.5f, maxTimeBetweenKeyFrames, 1 - speed);
+                    time += Mathf.Lerp(0.5f, Settings.Keying.MinTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
                 }
             }
 
@@ -635,7 +605,7 @@ namespace CameraAnimation
         }
 
         public static List<PropertyInfo> FocalDistanceProps = new List<PropertyInfo>();
-        public static List<PropertyInfo> AperatureProps = new List<PropertyInfo>();
+        public static List<PropertyInfo> ApertureProps = new List<PropertyInfo>();
         private ICameraCurve currentCurve;
 
         public IEnumerator RetrieveCamerasettingsParameter() {
@@ -663,7 +633,7 @@ namespace CameraAnimation
 
                 if (((float)field.GetValue(cameraSettings)) == 6.124f)
                 {
-                    AperatureProps.Add(field);
+                    ApertureProps.Add(field);
                     LoggerInstance.Msg("Found DofAperature under " + field.Name);
                 }
             }
@@ -677,8 +647,8 @@ namespace CameraAnimation
 
             if (FocalDistanceProps.Count != 2)
                 LoggerInstance.Error("Didnt find 2 DofFocalDistance attributes, found " + FocalDistanceProps.Count);
-            if (AperatureProps.Count != 2)
-                LoggerInstance.Error("Didnt find 2 DofAperature attributes, found " + AperatureProps.Count);
+            if (ApertureProps.Count != 2)
+                LoggerInstance.Error("Didnt find 2 DofAperature attributes, found " + ApertureProps.Count);
 
 
         }

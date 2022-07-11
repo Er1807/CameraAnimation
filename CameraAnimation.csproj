@@ -116,7 +116,9 @@
     <Compile Include="ICurve.cs" />
     <Compile Include="ITransformCurve.cs" />
     <Compile Include="IVectorCurves.cs" />
+    <Compile Include="QuaternionExtensions.cs" />
     <Compile Include="SerializationExtensions.cs" />
+    <Compile Include="Settings.cs" />
     <Compile Include="TransformCurve.cs" />
     <Compile Include="VectorCurves.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
