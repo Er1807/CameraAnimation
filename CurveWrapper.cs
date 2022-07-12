@@ -11,17 +11,18 @@ namespace CameraAnimation
     {
         private readonly AnimationCurve curve;
 
-        private readonly List<(string path, string key)> pathKeys = new List<(string, string)>();
+        private readonly IEnumerable<ICurveKey> pathKeys;
         private readonly Il2CppSystem.Type type;
 
         public CurveWrapper(AnimationCurve curve, string key)
         {
-            pathKeys.Add((string.Empty, key));
+            // technically we shouldn't instantiate this here, but im lazy
+            pathKeys = new CurveKey("",key);
             this.curve = curve;
             this.type = UnhollowerRuntimeLib.Il2CppType.Of<T>();
         }
 
-        public CurveWrapper(AnimationCurve curve, List<(string path, string key)> keys)
+        public CurveWrapper(AnimationCurve curve, IEnumerable<ICurveKey> keys)
         {
             pathKeys = keys;
             this.curve = curve;
@@ -41,9 +42,9 @@ namespace CameraAnimation
 
         public void Set(AnimationClip clip)
         {
-            foreach (var (path, key) in pathKeys)
+            foreach (var key in pathKeys)
             {
-                clip.SetCurve(path, type, key, curve);
+                clip.SetCurve(key.Path, type, key.Key, curve);
             }
         }
     }

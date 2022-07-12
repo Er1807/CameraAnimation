@@ -92,19 +92,12 @@ namespace CameraAnimation
 
         public Vector3 GetPosition()
         {
-            if (_cachedPosition.HasValue)
-                return _cachedPosition.Value;
-
-            return Photocamera.transform.position;
-
+            return _cachedPosition ?? Photocamera.transform.position;
         }
 
         public Vector4 GetRotation()
         {
-            if (_cachedRotation.HasValue)
-                return _cachedRotation.Value.ToVector4();
-
-            return Photocamera.transform.localRotation.ToVector4();
+            return _cachedRotation?.ToVector4() ?? Photocamera.transform.localRotation.ToVector4();
         }
 
         public void Serialize(StringBuilder builder)

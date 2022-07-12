@@ -111,11 +111,14 @@
   <ItemGroup>
     <Compile Include="CameraAnimation.cs" />
     <Compile Include="CameraCurve.cs" />
+    <Compile Include="CurveKey.cs" />
     <Compile Include="CurveWrapper.cs" />
     <Compile Include="ICameraCurve.cs" />
     <Compile Include="ICurve.cs" />
+    <Compile Include="ICurveKey.cs" />
     <Compile Include="ITransformCurve.cs" />
     <Compile Include="IVectorCurves.cs" />
+    <Compile Include="IVRCCamera.cs" />
     <Compile Include="QuaternionExtensions.cs" />
     <Compile Include="SerializationExtensions.cs" />
     <Compile Include="Settings.cs" />
@@ -124,6 +127,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SavedAnimations.cs" />
     <Compile Include="StoreTransform.cs" />
+    <Compile Include="VRCCamera.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CameraAnimation.json" />
