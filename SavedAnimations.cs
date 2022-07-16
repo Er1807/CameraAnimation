@@ -16,6 +16,11 @@ namespace CameraAnimation
 {
     public class SavedAnimations
     {
+        private const string floatRegex = "([0-9-.]+);";
+        private const string boolRegex = "(\\D{4,5});";
+        private const string vector2Regex = floatRegex + floatRegex;
+        private const string vector3Regex = vector2Regex + floatRegex;
+        private const string vector4Regex = vector3Regex + floatRegex;
         private CameraAnimationMod cameraAnimationMod;
         private MethodInfo UseKeyboardOnlyForText;
         public SavedAnimations(CameraAnimationMod cameraAnimationMod)
@@ -75,19 +80,17 @@ namespace CameraAnimation
             StringBuilder builder = new StringBuilder();
             foreach (var position in positions)
             {
-                builder.AppendLine(GenerateStringFromVector(position.Position) + GenerateStringFromVector(position.EulerAngles));
+                position.Serialize(builder);
+                builder.Append(Environment.NewLine);
             }
             return builder.ToString();
-        }
-        private string GenerateStringFromVector(Vector3 vector)
-        {
-            return $"{vector.x.ToString(CultureInfo.InvariantCulture)};{vector.y.ToString(CultureInfo.InvariantCulture)};{vector.z.ToString(CultureInfo.InvariantCulture)};";
         }
 
         private void LoadPositionsFromString(string text)
         {
             cameraAnimationMod.ClearAnimation();
-            Regex lineRegex = new Regex("([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);([0-9-.]+);");
+            
+            Regex lineRegex = new Regex(vector3Regex + vector4Regex + floatRegex + floatRegex + floatRegex + boolRegex + boolRegex + boolRegex + boolRegex);
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -98,18 +101,88 @@ namespace CameraAnimation
                     cameraAnimationMod.LoggerInstance.Error($"Error while loading line {line}");
                     return;
                 }
-                Vector3 positions = new Vector3(float.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture));
+                Vector3 positions = ParseVector3(match, 1);
+                Quaternion rotation = ParseVector4(match, 4).ToQuaternion();
 
-                Quaternion rotation  = Quaternion.Euler(float.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[5].Value, CultureInfo.InvariantCulture),
-                                                float.Parse(match.Groups[6].Value, CultureInfo.InvariantCulture));
+                float zoom = ParseFloat(match, 8, Settings.Camera.DefaultZoom);
+                float aperature = ParseFloat(match, 9, Settings.Camera.DefaultAperture);
+                float focalDistance = ParseFloat(match, 10, Settings.Camera.DefaultFocalDistance);
 
-                cameraAnimationMod.AddPosition(positions, rotation);
+                bool keyPosition = ParseBool(match, 11);
+                bool keyRotation = ParseBool(match, 12);
+                bool keyZoom = ParseBool(match, 13);
+                bool keyFocus = ParseBool(match, 14);
+                CameraAnimationMod.Instance.LoggerInstance.Msg((keyPosition, keyRotation, keyZoom, keyFocus));
+                var newTransform = new StoreTransform(aperature, focalDistance, zoom, positions, rotation) { 
+                    KeyPosition = keyPosition,
+                    KeyRotation = keyRotation,
+                    KeyZoom = keyZoom,
+                    KeyFocus = keyFocus
+                };
+
+                cameraAnimationMod.AddPosition(newTransform);
             }
         }
 
+        bool ParseBool(Match match, int offset)
+        {
+            CameraAnimationMod.Instance.LoggerInstance.Msg("Bool: " + match.Groups[offset].Value);
+
+            if (bool.TryParse(match.Groups[offset].Value, out bool x))
+            {
+                return x;
+            }
+            return false;
+        }
+
+        float ParseFloat(Match match, int offset, float defaultValue = 0)
+        {
+            CameraAnimationMod.Instance.LoggerInstance.Msg("Float: " + match.Groups[offset].Value);
+            if (float.TryParse(match.Groups[offset].Value, out float parsed))
+            {
+                return parsed;
+            }
+            return defaultValue;
+        }
+
+        Vector4 ParseVector4(Match match, int offset)
+        {
+            Vector4 result = new Vector4();
+
+            result.x = ParseFloat(match, offset);
+            result.y = ParseFloat(match, offset +1);
+            result.z = ParseFloat(match, offset +2);
+            result.w = ParseFloat(match, offset +3);
+            
+            return result;
+        }
+
+        Vector3 ParseVector3(Match match, int offset)
+        {
+            Vector3 result = new Vector3();
+
+            result.x = ParseFloat(match, offset);
+            result.y = ParseFloat(match, offset + 1);
+            result.z = ParseFloat(match, offset + 2);
+
+            return result;
+        }
+
+        Vector2 ParseVector2(Match match, int offset)
+        {
+            Vector2 result = new Vector2();
+
+            if (float.TryParse(match.Groups[offset].Value, out float x))
+            {
+                result.x = x;
+            }
+            if (float.TryParse(match.Groups[offset+1].Value, out float y))
+            {
+                result.y = y;
+            }
+
+            return result;
+        }
 
         internal static string Clipboard
         {

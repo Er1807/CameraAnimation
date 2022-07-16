@@ -17,15 +17,16 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\..\Program Files %28x86%29\Steam\steamapps\common\VRChat\Mods\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>C:\Program Files %28x86%29\Steam\steamapps\common\VRChat\Mods\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -109,13 +110,32 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CameraAnimation.cs" />
+    <Compile Include="CameraCurve.cs" />
+    <Compile Include="CurveKey.cs" />
+    <Compile Include="CurveWrapper.cs" />
+    <Compile Include="ICameraCurve.cs" />
+    <Compile Include="ICurve.cs" />
+    <Compile Include="ICurveKey.cs" />
+    <Compile Include="ITransformCurve.cs" />
+    <Compile Include="IVectorCurves.cs" />
+    <Compile Include="IVRCCamera.cs" />
+    <Compile Include="QuaternionExtensions.cs" />
+    <Compile Include="SerializationExtensions.cs" />
+    <Compile Include="Settings.cs" />
+    <Compile Include="TransformCurve.cs" />
+    <Compile Include="VectorCurves.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SavedAnimations.cs" />
     <Compile Include="StoreTransform.cs" />
+    <Compile Include="VRCCamera.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CameraAnimation.json" />
     <EmbeddedResource Include="icons-camera" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>

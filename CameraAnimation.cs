@@ -11,7 +11,6 @@ using TMPro;
 using TouchCamera;
 using UnhollowerRuntimeLib;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using VRC;
@@ -19,18 +18,24 @@ using VRC.SDKBase;
 using VRC.UserCamera;
 using VRCSDK2;
 using CameraButton = MonoBehaviourPublicObGaCaTMImReImRaReSpUnique;
+using CameraSettings = MonoBehaviourPublicAcInCaInTeShInMaBoInUnique;
+using CameraSlider = MonoBehaviourPublicAc2ObSicaObdotySlObUnique;
+using CameraSliderEnum = EnumPublicSealedvaNoDoZoDo6vDoUnique;
+using CameraFocusMode = EnumPublicSealedvaOfFuSeMa5vUnique;
+using Il2CppSystem.Reflection;
 
-[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.0", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(CameraAnimationMod), "Camera Animations", "2.3.1", "Eric van Fandenfart")]
 [assembly: MelonAdditionalDependencies("ActionMenuApi", "UIExpansionKit")]
 [assembly: MelonOptionalDependencies("TouchCamera")]
 [assembly: MelonGame]
 
 namespace CameraAnimation
 {
-
     public class CameraAnimationMod : MelonMod
     {
         private static AssetBundle iconsAssetBundle;
+        private readonly IVRCCamera gameCamera = new VRCCamera();
+
         static CameraAnimationMod()
         {
             try
@@ -55,58 +60,21 @@ namespace CameraAnimation
             return iconsAssetBundle.LoadAsset_Internal($"Assets/icons-camera/{name}.png", Il2CppType.Of<Texture2D>()).Cast<Texture2D>();
         }
 
-        private GameObject originalCamera
-        {
-            get
-            {
-                UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
-                if (controller == null) return null;
-                foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
-                {
-                    var obj = prop.GetValue(controller) as GameObject;
-                    if (obj != null && obj.name == "PhotoCamera")
-                        return obj;
-                }
-
-                return null;
-            }
-        }
-
-        private GameObject originalVideoCamera
-        {
-            get
-            {
-                UserCameraController controller = UserCameraController.field_Internal_Static_UserCameraController_0;
-                if (controller == null) return null;
-                foreach (var prop in typeof(UserCameraController).GetProperties().Where(x => x.Name.StartsWith("field_Public_GameObject_")))
-                {
-                    var obj = prop.GetValue(controller) as GameObject;
-                    if (obj != null && obj.name == "VideoCamera")
-                        return obj;
-                }
-
-                return null;
-            }
-        }
-
         public readonly List<StoreTransform> positions = new List<StoreTransform>();
-        private float speed = 0.5f;
-        private bool loopMode = false;
-        private bool syncCameraIcon = true;
-        private bool constantSpeed = false;
-        private bool showPath = true;
+
         private bool videoCameraWasActive = false;
         private LineRenderer lineRenderer;
         private Animation anim = null;
         private bool shouldBePlaying = false;
-
-
-
+        
         private SavedAnimations savedAnimations = null;
+
+        public static CameraAnimationMod Instance;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public override void OnApplicationStart()
         {
+            Instance = this;
             if (MelonHandler.Mods.Any(x => x.Info.Name == "TouchCamera"))
             {
                 AddTochCameraHook();
@@ -115,6 +83,7 @@ namespace CameraAnimation
             {
                 MelonCoroutines.Start(WaitForCamera());
             }
+            MelonCoroutines.Start(RetrieveCamerasettingsParameter());
 
             savedAnimations = new SavedAnimations(this);
             var icon = LoadImage("play");
@@ -129,17 +98,21 @@ namespace CameraAnimation
                 VRCActionMenuPage.AddSubMenu(ActionMenuPage.Main, "Camera Animation", CreateActionMenu, icon);
 
             LoggerInstance.Msg("Actionmenu initialised");
+
+            // allow all instances of StoreTransform to toggle the camera pickup
+            // without linking vrc in the StoreTransform file
+            StoreTransform.SetCameraPickupable = SetPickupable;
         }
 
         private void CreateActionMenu()
         {
-            if (originalCamera == null) return;
+            if (gameCamera.PhotoCamera == null) return;
 
             if (lineRenderer == null)
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
                 lineRenderer.positionCount = 0;
-                lineRenderer.SetWidth(0.05f, 0.05f);
+                lineRenderer.SetWidth(Settings.UI.PathWidth, Settings.UI.PathWidth);
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
 
@@ -152,23 +125,37 @@ namespace CameraAnimation
             CustomSubMenu.AddSubMenu("Settings",
                 delegate
                 {
-                    CustomSubMenu.AddRadialPuppet("Speed", (x) => speed = x, speed, LoadImage("speed"));
-                    CustomSubMenu.AddToggle("Loop mode", loopMode, (x) => { loopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
-                    CustomSubMenu.AddToggle("Sync Camera\nIcon", syncCameraIcon, (x) =>
+                    CustomSubMenu.AddRadialPuppet("Speed", (x) => Settings.Animation.Speed = x, Settings.Animation.Speed, LoadImage("speed"));
+                    CustomSubMenu.AddToggle("Loop mode", Settings.Animation.LoopMode, (x) => { Settings.Animation.LoopMode = x; UpdateLineRenderer(); }, LoadImage("loop mode"));
+                    CustomSubMenu.AddToggle("Sync Camera\nIcon", Settings.UI.SyncLens, (x) =>
                     {
-                        syncCameraIcon = x;
+                        Settings.UI.SyncLens = x;
                         if (Player.prop_Player_0 != null)
-                            Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = syncCameraIcon;
+                            Player.prop_Player_0.gameObject.GetComponentInChildren<UserCameraIndicator>().enabled = Settings.UI.SyncLens;
                     }, LoadImage("sync camera icon"));
 
-                    CustomSubMenu.AddToggle("Constant\nSpeed", constantSpeed, (x) => { constantSpeed = x; }, LoadImage("constant speed"));
-                    CustomSubMenu.AddToggle("Show\nPath", showPath, (x) =>
+                    CustomSubMenu.AddToggle("Constant\nSpeed", Settings.Animation.ConstantSpeed, (x) => { Settings.Animation.ConstantSpeed = x; }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Enable\nKey Pickup", Settings.Interaction.AllowCameraPickup, (x) => { Settings.Interaction.AllowCameraPickup = x; UpdatePickupable(); }, LoadImage("constant speed"));
+                    CustomSubMenu.AddToggle("Show\nPath", Settings.UI.ShowPath, (x) =>
                     {
-                        showPath = x;
-                        lineRenderer.enabled = showPath;
+                        Settings.UI.ShowPath = x;
+                        lineRenderer.enabled = Settings.UI.ShowPath;
                     }, LoadImage("show path"));
-
+                    CustomSubMenu.AddRadialPuppet("Path\nWidth", (x) => Settings.UI.PathWidth = x, Settings.UI.PathWidth, LoadImage("save pos"));
+                    CustomSubMenu.AddButton("Reset\nSettings", () => Settings.Reset(), LoadImage("save pos"));
                 }, LoadImage("settings"));
+
+            CustomSubMenu.AddSubMenu("Keying",
+                delegate
+                {
+                    CustomSubMenu.AddToggle("Position", Settings.Keying.KeyPosition, (x) => { Settings.Keying.KeyPosition = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Rotation", Settings.Keying.KeyRotation, (x) => { Settings.Keying.KeyRotation = x;  }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Zoom", Settings.Keying.KeyZoom, (x) => { Settings.Keying.KeyZoom = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddToggle("Focus", Settings.Keying.KeyFocus, (x) => { Settings.Keying.KeyFocus = x; }, LoadImage("save pos"));
+                    CustomSubMenu.AddRadialPuppet("Max Key Length", (x) => Settings.Keying.MaxTimeBetweenKeyFrames = x * (Settings.Keying.DefaultMaxTimeBetweenKeyFrames * 10 * 2), Settings.Keying.MaxTimeBetweenKeyFrames / 20, LoadImage("speed"));
+                    CustomSubMenu.AddRadialPuppet("Min Key Length", (x) => Settings.Keying.MinTimeBetweenKeyFrames = x * (Settings.Keying.DefaultMinTimeBetweenKeyFrames * 10 * 2), Settings.Keying.MinTimeBetweenKeyFrames / 20, LoadImage("speed"));
+                }, LoadImage("settings"));
+
 
             CustomSubMenu.AddSubMenu("Saved",
                 delegate
@@ -214,7 +201,7 @@ namespace CameraAnimation
             if (lineRenderer == null)
             {
                 lineRenderer = new GameObject("CameraAnimations") { layer = LayerMask.NameToLayer("UI") }.AddComponent<LineRenderer>();
-                lineRenderer.SetWidth(0.05f, 0.05f);
+                lineRenderer.SetWidth(Settings.UI.PathWidth, Settings.UI.PathWidth);
                 lineRenderer.positionCount = 0;
                 GameObject.DontDestroyOnLoad(lineRenderer);
             }
@@ -256,7 +243,7 @@ namespace CameraAnimation
                 GameObject.Destroy(lineRenderer.transform.GetChild(i).gameObject);
             }
 
-            loopMode = false;
+            Settings.Animation.LoopMode = false;
         }
 
         public void RemoveLastPosition()
@@ -269,195 +256,241 @@ namespace CameraAnimation
 
         public void AddCurrentPositionToList()
         {
-            AddPosition(originalCamera.transform.position, originalCamera.transform.rotation);
+            var newTransform = new StoreTransform(gameCamera.PhotoCamera);
+
+            AddPosition(newTransform);
         }
 
-        public void AddPosition(Vector3 position, Quaternion rotation)
+        public void AddPosition(StoreTransform position)
         {
             var oldValue = UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0;
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
 
-            var photoCameraClone = GameObject.Instantiate(originalCamera, lineRenderer.transform);
+            var photoCameraClone = GameObject.Instantiate(gameCamera.PhotoCamera, lineRenderer.transform);
             photoCameraClone.GetComponentInChildren<MeshRenderer>().gameObject.layer = LayerMask.NameToLayer("UI");
-            photoCameraClone.GetComponent<Camera>().enabled = false;
+            
+            var camera = photoCameraClone.GetComponent<Camera>();
+            camera.enabled = false;
+
             photoCameraClone.GetComponent<FlareLayer>().enabled = false;
-            photoCameraClone.GetComponent<VRC.SDKBase.VRC_Pickup>().pickupable = true;
             photoCameraClone.GetComponentInChildren<MeshRenderer>().material = UserCameraController.field_Internal_Static_UserCameraController_0.field_Public_Material_3;
             GameObject.Destroy(photoCameraClone.transform.Find("VideoCamera").gameObject);
-            photoCameraClone.transform.position = position;
-            photoCameraClone.transform.rotation = rotation;
-            positions.Add(new StoreTransform(photoCameraClone));
+            photoCameraClone.transform.position = position.Position;
+            photoCameraClone.transform.rotation = position.Rotation.ToQuaternion();
+
+            position.Photocamera = photoCameraClone;
+
+            positions.Add(position);
+
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = oldValue;
             UpdateLineRenderer();
+        }
+
+        /// <summary>
+        /// Sets the pickupable status of the provided gameobject
+        /// </summary>
+        void SetPickupable(bool value, GameObject obj)
+        {
+            if (obj)
+            {
+                var pickup = obj.GetComponent<VRC.SDKBase.VRC_Pickup>();
+
+                if (pickup)
+                {
+                    pickup.pickupable = value;
+                }
+            }
+            
+        }
+
+        /// <summary>
+        /// updates all StoreTransforms within positions to use the current allowKeyCameraPickup value;
+        /// </summary>
+        void UpdatePickupable()
+        {
+            foreach (var transform in positions)
+            {
+                transform.Pickupable = Settings.Interaction.AllowCameraPickup;
+            }
         }
 
         public void UpdateLineRenderer()
         {
             if (positions.Count == 0) { lineRenderer.positionCount = 0; return; }
 
-            var (curveX, curveY, curveZ, _, _, _) = CreateCurves();
-            float lasttime = curveX.keys[curveX.length - 1].time;
+            ICameraCurve curve = CreateCurves();
+            float lasttime = curve.Transform.Position.X.Last.time;
             int countPoints = positions.Count * 10;
             float fraction = lasttime / countPoints;
             lineRenderer.positionCount = countPoints + 1;
             for (int i = 0; i <= countPoints; i++)
             {
-                lineRenderer.SetPosition(i, new Vector3(curveX.Evaluate(fraction * i), curveY.Evaluate(fraction * i), curveZ.Evaluate(fraction * i)));
+                float time = fraction * i;
+                lineRenderer.SetPosition(i, curve.Transform.Position.Evaluate(time) );
             }
 
         }
 
         public override void OnLateUpdate()
         {
-            if (anim == null || originalCamera == null) return;
-
-
-
+            if (anim == null || gameCamera.PhotoCamera == null) return;
 
             if (anim.isPlaying)
             {
-                originalVideoCamera.active = true;
+                gameCamera.VideoCamera.active = true;
             }
-            else if (loopMode)
+            else if (Settings.Animation.LoopMode)
             {
-                originalVideoCamera.active = true;
+                gameCamera.VideoCamera.active = true;
                 PlayAnimation();
             }
             else if (shouldBePlaying)
             {
                 if (!videoCameraWasActive)
-                    originalVideoCamera.active = false;
+                    gameCamera.VideoCamera.active = false;
                 shouldBePlaying = false;
                 UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.Attached;
             }
 
         }
 
-        public AnimationClip CreateClip()
+        public ICameraCurve CreateCameraCurve()
         {
+            IVector4Curve Vector4Wrap(string prefix)
+            {
+                return new Vector4Curve()
+                {
+                    X = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".x"),
+                    Y = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".y"),
+                    Z = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".z"),
+                    W = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".w")
+                };
+            }
 
-            AnimationCurve curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ;
+            IVector3Curve Vector3Wrap(string prefix)
+            {
+                return new Vector3Curve()
+                {
+                    X = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".x"),
+                    Y = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".y"),
+                    Z = new CurveWrapper<Transform>(new AnimationCurve(), prefix + ".z")
+                };
+            }
 
-            (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ) = CreateCurves();
+            const string positionPrefix = nameof(Transform.localPosition);
+            const string rotationPrefix = nameof(Transform.localRotation);
 
+            string zoomKey = ZoomProps[0]?.Name ?? string.Empty;
+            string apertureKey = ApertureProps[0]?.Name ?? string.Empty;
+            string alternateApertureKey = ApertureProps[1]?.Name ?? string.Empty;
+            string focalDistanceKey = FocalDistanceProps[0]?.Name ?? string.Empty;
+            string alternateFocalDistanceKey = FocalDistanceProps[1]?.Name ?? string.Empty;
 
-            AnimationClip clip = new AnimationClip();
-            clip.legacy = true;
+            CurveKey zoomCurveKey = new CurveKey("VideoCamera", zoomKey);
+            CurveKey apertureCurveKey = new CurveKey("VideoCamera", apertureKey, alternateApertureKey);
+            CurveKey focalDistanceCurveKey = new CurveKey("VideoCamera", focalDistanceKey, alternateFocalDistanceKey);
 
-            var type = UnhollowerRuntimeLib.Il2CppType.Of<Transform>();
-            clip.SetCurve("", type, "localPosition.x", curveX);
-            clip.SetCurve("", type, "localPosition.y", curveY);
-            clip.SetCurve("", type, "localPosition.z", curveZ);
-
-            clip.SetCurve("", type, "localEulerAngles.x", curveRotX);
-            clip.SetCurve("", type, "localEulerAngles.y", curveRotY);
-            clip.SetCurve("", type, "localEulerAngles.z", curveRotZ);
-
-            clip.EnsureQuaternionContinuity();
-            return clip;
-
-
+            return new CameraCurve()
+            {
+                Transform = new TransformCurve()
+                {
+                    Position = Vector3Wrap(positionPrefix),
+                    Rotation = Vector4Wrap(rotationPrefix)
+                },
+                Aperture = new CurveWrapper<CameraSettings>(new AnimationCurve(), apertureCurveKey),
+                FocalDistance = new CurveWrapper<CameraSettings>(new AnimationCurve(), focalDistanceCurveKey),
+                Zoom = new CurveWrapper<CameraSettings>(new AnimationCurve(), zoomCurveKey),
+            };
         }
 
-        private (AnimationCurve curveX, AnimationCurve curveY, AnimationCurve curveZ, AnimationCurve curveRotX, AnimationCurve curveRotY, AnimationCurve curveRotZ) CreateCurves()
+        public AnimationClip CreateClip()
         {
-            AnimationCurve curveX = new AnimationCurve();
-            AnimationCurve curveY = new AnimationCurve();
-            AnimationCurve curveZ = new AnimationCurve();
-            AnimationCurve curveRotX = new AnimationCurve();
-            AnimationCurve curveRotY = new AnimationCurve();
-            AnimationCurve curveRotZ = new AnimationCurve();
+            currentCurve = CreateCurves();
+            
+            AnimationClip clip = new AnimationClip();
+            clip.legacy = true;
+            clip.name = "CameraAnimation";
+            currentCurve.Set(clip);
+
+            clip.EnsureQuaternionContinuity();
+
+            return clip;
+        }
+
+        private ICameraCurve CreateCurves()
+        {
+            ICameraCurve curve = CreateCameraCurve();
+
             float time = 0;
 
-            if (loopMode)
+            if (Settings.Animation.LoopMode)
+            {
                 positions.Add(new StoreTransform(positions[0].Photocamera));
+            }
 
             for (int i = 0; i < positions.Count; i++)
             {
-                curveX.AddKey(time, positions[i].Position.x);
-                curveY.AddKey(time, positions[i].Position.y);
-                curveZ.AddKey(time, positions[i].Position.z);
+                var transform = positions[i];
 
-                float rotX = positions[i].EulerAngles.x;
-                float rotY = positions[i].EulerAngles.y;
-                float rotZ = positions[i].EulerAngles.z;
-                if (i == 0)
+                if (transform.KeyZoom)
                 {
-                    positions[i].EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
+                    curve.Zoom.Add(time, transform.Zoom);
                 }
-                else if (i != 0)
+
+                if (transform.KeyFocus)
                 {
-                    //correct rotations to be negative if needed and writeback for next itteration
-                    float lastRotX = positions[i - 1].EulerAngles.x;
-                    float lastRotY = positions[i - 1].EulerAngles.y;
-                    float lastRotZ = positions[i - 1].EulerAngles.z;
+                    curve.Aperture.Add(time, transform.Aperture);
+                    curve.FocalDistance.Add(time, transform.FocalDistance);
+                }
 
-                    float lastRotXAdj = positions[i - 1].EulerAnglesCorrected.x;
-                    float lastRotYAdj = positions[i - 1].EulerAnglesCorrected.y;
-                    float lastRotZAdj = positions[i - 1].EulerAnglesCorrected.z;
-
-                    float diffX = rotX - lastRotX;
-                    float diffY = rotY - lastRotY;
-                    float diffZ = rotZ - lastRotZ;
-
-                    if (diffX > 180)
-                        diffX -= 360;
-                    if (diffY > 180)
-                        diffY -= 360;
-                    if (diffZ > 180)
-                        diffZ -= 360;
-
-                    if (diffX < -180)
-                        diffX = 360 + diffX;
-                    if (diffY < -180)
-                        diffY = 360 + diffY;
-                    if (diffZ < -180)
-                        diffZ = 360 + diffZ;
-
-                    rotX = lastRotXAdj + diffX;
-                    rotY = lastRotYAdj + diffY;
-                    rotZ = lastRotZAdj + diffZ;
-
-
-                    positions[i].EulerAnglesCorrected = new Vector3(rotX, rotY, rotZ);
-                } // 342 -> 60   360+60 = 420
-                rotX = positions[i].EulerAnglesCorrected.x;
-                rotY = positions[i].EulerAnglesCorrected.y;
-                rotZ = positions[i].EulerAnglesCorrected.z;
-
-                curveRotX.AddKey(time, rotX);
-                curveRotY.AddKey(time, rotY);
-                curveRotZ.AddKey(time, rotZ);
-                if (i < positions.Count - 1 && constantSpeed)
+                if (transform.KeyPosition)
                 {
-                    float distance = Vector3.Distance(positions[i].Position, positions[i + 1].Position);
-                    time += distance * Mathf.Lerp(0.2f, 5f, 1 - speed);
+                    curve.Transform.Position.Add(time, transform.Position);
+                }
+
+                if (transform.KeyRotation)
+                {
+                    curve.Transform.Rotation.Add(time, transform.Rotation);
+
+                }
+
+                if (i < positions.Count - 1 && Settings.Animation.ConstantSpeed)
+                {
+                    var nextTransform = positions[i + 1];
+                    float distance = Vector3.Distance(transform.Position, nextTransform.Position);
+                    time += distance * Mathf.Lerp(Settings.Keying.MinTimeBetweenKeyFrames, Settings.Keying.MaxTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
                 }
                 else
                 {
-                    time += Mathf.Lerp(0.5f, 5f, 1 - speed);
+                    time += Mathf.Lerp(Settings.Keying.MinTimeBetweenKeyFrames, Settings.Keying.MaxTimeBetweenKeyFrames, 1 - Settings.Animation.Speed);
                 }
             }
-            if (loopMode)
+
+            if (Settings.Animation.LoopMode)
                 positions.RemoveAt(positions.Count - 1);
 
-            return (curveX, curveY, curveZ, curveRotX, curveRotY, curveRotZ);
+            return curve;
         }
 
         public void PlayAnimation()
         {
             if (!shouldBePlaying)
-                videoCameraWasActive = originalVideoCamera.active;
+                videoCameraWasActive = gameCamera.VideoCamera.active;
+
+            if (positions.Count == 0) return;
 
             UserCameraController.field_Internal_Static_UserCameraController_0.prop_UserCameraSpace_0 = UserCameraSpace.World;
-            anim = originalCamera.GetComponent<Animation>();
+            
+            anim = gameCamera.PhotoCamera.GetComponent<Animation>();
             if (anim == null)
-                anim = originalCamera.AddComponent<Animation>();
+                anim = gameCamera.PhotoCamera.AddComponent<Animation>();
 
             var clip = CreateClip();
             anim.AddClip(clip, clip.name);
+
             anim.Play(clip.name);
+
             if(MelonHandler.Mods.Any(x => x.Info.Name == "FreezeFrame"))
             {
                 var cloneHolder = SceneManager.GetActiveScene().GetRootGameObjects().FirstOrDefault(x => x.name == "Avatar Clone Holder");
@@ -472,11 +505,68 @@ namespace CameraAnimation
         }
         private void StopAnimation()
         {
-            if (anim != null)
-            {
-                anim.Stop();
-            }
+            anim?.Stop();
         }
 
+
+        public static List<FieldInfo> FocalDistanceProps = new List<FieldInfo>();
+        public static List<FieldInfo> ApertureProps = new List<FieldInfo>();
+        public static List<FieldInfo> ZoomProps = new List<FieldInfo>();
+
+        private ICameraCurve currentCurve;
+
+        public IEnumerator RetrieveCamerasettingsParameter() {
+            while (gameCamera.PhotoCamera == null) yield return null;
+            while (!gameCamera.PhotoCamera.gameObject.active) yield return null;
+
+            LoggerInstance.Msg("Applying detection values");
+
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 5.124f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 6.124f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.Zoom, 47.154f);
+            gameCamera.Settings.enabled = true;
+            gameCamera.Settings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.Manual;
+
+            yield return new WaitForSeconds(1);
+
+            LoggerInstance.Msg("checking values");
+
+            foreach (var field in Il2CppType.Of<CameraSettings>().GetFields().Where(x => x.FieldType.Name == "Single"))
+            {
+                //LoggerInstance.Msg("checking field " + field.Name +"With value " + field.GetValue(cameraSettings).Unbox<float>());
+                if (field.GetValue(gameCamera.Settings).Unbox<float>() == 5.124f)
+                {
+                    FocalDistanceProps.Add(field);
+                    LoggerInstance.Msg("Found DofFocalDistance under " + field.Name);
+                }
+
+                if (field.GetValue(gameCamera.Settings).Unbox<float>() == 6.124f)
+                {
+                    ApertureProps.Add(field);
+                    LoggerInstance.Msg("Found DofAperature under " + field.Name);
+                }
+
+                if (field.GetValue(gameCamera.Settings).Unbox<float>() == 47.154f)
+                {
+                    ZoomProps.Add(field);
+                    LoggerInstance.Msg("Found Zoom under " + field.Name);
+                }
+            }
+
+            LoggerInstance.Msg("Restoring values");
+
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofFocalDistance, 1.5f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.DofAperature, 15f);
+            CameraSlider.field_Private_Static_Action_2_EnumPublicSealedvaNoDoZoDo6vDoUnique_Single_0.Invoke(CameraSliderEnum.Zoom, 45f);
+            gameCamera.Settings.field_Public_EnumPublicSealedvaOfFuSeMa5vUnique_0 = CameraFocusMode.FullAuto;
+            gameCamera.Settings.enabled = false;
+
+            if (FocalDistanceProps.Count != 2)
+                LoggerInstance.Error("Didnt find 2 DofFocalDistance attributes, found " + FocalDistanceProps.Count);
+            if (ApertureProps.Count != 2)
+                LoggerInstance.Error("Didnt find 2 DofAperature attributes, found " + ApertureProps.Count);
+            if (ZoomProps.Count != 1)
+                LoggerInstance.Error("Didnt find 1 Zoom attributes, found " + ApertureProps.Count);
+        }
     }
 }
