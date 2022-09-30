@@ -1,3 +1,5 @@
+Now handled under the following repo https://github.com/Er1807/CVR-Mods
+
 # CameraAnimation
 Create animations for recording scenes in VRChat. Only usable with VR in the current version
 
